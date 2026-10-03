@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Build DesktopFly and wrap it in a .app bundle.
+# Build Buzzkill and wrap it in a .app bundle.
 #   ./package.sh              -> ./dist/Buzzkill.app (native arch)
 #   ./package.sh --install    -> also copies to /Applications and launches it
 #   ./package.sh --universal  -> arm64 + x86_64 binary (for releases)
@@ -14,8 +14,8 @@ if [[ " $* " == *" --universal "* ]]; then
     swiftc -module-cache-path "${TMPDIR:-/tmp}/desktopfly-module-cache-$arch" -O -swift-version 5 \
       -target "$arch-apple-macos13.0" -o "Buzzkill-$arch" "${SRCS[@]}" "${FW[@]}"
   done
-  lipo -create -output Buzzkill DesktopFly-arm64 DesktopFly-x86_64 && rm -f DesktopFly-arm64 DesktopFly-x86_64
-  echo "Built universal ./DesktopFly ($(lipo -archs DesktopFly))"
+  lipo -create -output Buzzkill Buzzkill-arm64 Buzzkill-x86_64 && rm -f Buzzkill-arm64 Buzzkill-x86_64
+  echo "Built universal ./Buzzkill ($(lipo -archs Buzzkill))"
 else
   ./build.sh
 fi
@@ -43,7 +43,7 @@ echo "Built $APP"
 if [[ " $* " == *" --install "* ]]; then
   TARGET=/Applications/Buzzkill.app
   pkill -x Buzzkill 2>/dev/null || true
-  while pgrep -x DesktopFly >/dev/null; do sleep 0.1; done
+  while pgrep -x Buzzkill >/dev/null; do sleep 0.1; done
   # Remove rather than overwrite: replacing a signed binary in place can get
   # it killed by the kernel on Apple Silicon.
   rm -rf "$TARGET"

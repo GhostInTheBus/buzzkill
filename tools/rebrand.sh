@@ -13,10 +13,8 @@ echo "renaming DesktopFly -> $NAME ($EXE, $BUNDLE)"
 # packaging
 sed -i '' -e "s#<string>DesktopFly</string>#<string>$EXE</string>#g" \
           -e "s#<string>local.desktopfly</string>#<string>$BUNDLE</string>#" packaging/Info.plist
-sed -i '' -e "s#DesktopFly\.app#$EXE.app#g" -e "s#MacOS/DesktopFly#MacOS/$EXE#g" \
-          -e "s#-o DesktopFly #-o $EXE #g" -e "s#cp DesktopFly #cp $EXE #g" \
-          -e "s#pkill -x DesktopFly#pkill -x $EXE#g" -e "s#DesktopFly-\$arch#$EXE-\$arch#g" \
-          -e "s#lipo -create -output DesktopFly#lipo -create -output $EXE#g" package.sh
+# every DesktopFly token in the packaging script is the app, so rename them all
+sed -i '' -e "s#DesktopFly#$EXE#g" package.sh
 sed -i '' -e "s#-o DesktopFly #-o $EXE #" -e "s#Built ./DesktopFly#Built ./$EXE#" build.sh
 # the menu bar title and header
 sed -i '' -e "s#menu.addItem(withTitle: \"Desktop Fly\"#menu.addItem(withTitle: \"$NAME\"#" main.swift
