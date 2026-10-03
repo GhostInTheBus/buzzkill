@@ -16,9 +16,11 @@ final class GameUI: NSObject {
     private(set) var attractOn = false, squishOn = true, soundOn = true, cameraOn = false, hearingOn = false
     private var attractItem, squishItem, soundItem, cameraItem, loginItem, statsItem, hitboxItem, hearingItem: NSMenuItem?
     private var hearing: Hearing?
-    static let hitboxKey = "hitbox"
-    private static let hitboxes: [(name: String, px: CGFloat)] = [("Normal", 26), ("Forgiving", 34), ("Tiny", 18)]
-    private var hitboxIndex = 0
+    // Difficulty dulls or sharpens the fly's senses (what reaches its looming
+    // detectors and ears); the hitbox never changes. An easy fly is a dull fly.
+    static let difficultyKey = "difficulty"
+    private static let difficulties: [(name: String, acuity: Float)] = [("Normal", 1.0), ("Dull senses (easy)", 0.6), ("Sharp senses (hard)", 1.5)]
+    private var difficultyIndex = 0
 
     private var flySound: FlySound?
     private var cameraSense: CameraSense?
@@ -58,7 +60,7 @@ final class GameUI: NSObject {
         menu.addItem(soundItem!)
         squishItem = item("Squish on Click: On", #selector(toggleSquish), "k")
         menu.addItem(squishItem!)
-        hitboxItem = item("Hitbox: Normal", #selector(cycleHitbox), "x")
+        hitboxItem = item("Difficulty: Normal", #selector(cycleDifficulty), "x")
         menu.addItem(hitboxItem!)
         cameraItem = item("Camera Swat: Off", #selector(toggleCamera), "c")
         menu.addItem(cameraItem!)
@@ -88,7 +90,7 @@ final class GameUI: NSObject {
         setSound(d.object(forKey: GameUI.soundKey) as? Bool ?? true)
         if d.bool(forKey: GameUI.cameraKey), CameraSense.authorization == .authorized { startCamera() }
         if d.bool(forKey: GameUI.hearingKey), Hearing.authorization == .authorized { startHearing() }
-        setHitbox(d.integer(forKey: GameUI.hitboxKey))
+        setDifficulty(d.integer(forKey: GameUI.difficultyKey))
         coordinator.enqueue { [weak self] c in
             c.game.onMiss = { lead in DispatchQueue.main.async { self?.showMiss(lead: lead) } }
         }
@@ -112,13 +114,13 @@ final class GameUI: NSObject {
         statsItem?.title = coordinator.game.stats.summary
     }
 
-    @objc func cycleHitbox() { setHitbox((hitboxIndex + 1) % GameUI.hitboxes.count) }
-    private func setHitbox(_ i: Int) {
-        hitboxIndex = max(0, min(GameUI.hitboxes.count - 1, i))
-        let h = GameUI.hitboxes[hitboxIndex]
-        coordinator.enqueue { c in c.game.splats.hitRadius = h.px }
-        UserDefaults.standard.set(hitboxIndex, forKey: GameUI.hitboxKey)
-        hitboxItem?.title = "Hitbox: \(h.name)"
+    @objc func cycleDifficulty() { setDifficulty((difficultyIndex + 1) % GameUI.difficulties.count) }
+    private func setDifficulty(_ i: Int) {
+        difficultyIndex = max(0, min(GameUI.difficulties.count - 1, i))
+        let d = GameUI.difficulties[difficultyIndex]
+        coordinator.enqueue { c in c.sim?.senseAcuity = d.acuity }
+        UserDefaults.standard.set(difficultyIndex, forKey: GameUI.difficultyKey)
+        hitboxItem?.title = "Difficulty: \(d.name)"
     }
 
     // MARK: input routing (main thread)

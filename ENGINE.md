@@ -33,6 +33,7 @@ Keep this list short and current; it is what makes `tools/merge-upstream.sh` pai
 
 **`Sim.swift`**
 - `attractTurn/attractDrive/attractGroom` inputs with `attractFwdGain`/`attractTurnGain`, injected per step into DNa01/02, DNp09, DNg11. Natural DNp09 is ~2 Hz; above ~20 Hz the leg circuit jams — measured, see `--attracttest`.
+- `senseAcuity`: one multiplier on what reaches the looming detectors and the auditory/wind neurons (the Difficulty setting). The circuit is untouched.
 - `alert` input (`alertGain`): drives the 16 sensory partners only — auditory JO-A5/JO-B1 neurons per the FlyWire annotations, 13 of them presynaptic to GF — so sound primes escape through real wiring (no direct GF current). `--populationtest` measures it: sound alone near silent, more escapes at a marginal loom.
 
 **`build.sh`**: the three new directories, `-framework AVFoundation`, and upstream PR #18's flags `-wmo -enforce-exclusivity=unchecked` (locomotortest 8.7 s → 2.5 s here; live CPU 41% → 28% with one fly).

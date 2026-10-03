@@ -195,6 +195,22 @@ func runPopulationTest() {
             sim.step(400); _ = sim.consumeGF(); sim.alert = 1
             for _ in 0..<200 { sim.step(100); if sim.consumeGF() { spurious += 1 } }
         }
+        func escapesAcuity(_ a: Float) -> Int {
+            var n = 0
+            for seed in 0..<40 {
+                TestRandom.reset("acuity \(seed)")
+                let sim = LIFSim(circuit: data.circuit, spikeBus: nil)
+                sim.senseAcuity = a
+                sim.step(400); _ = sim.consumeGF()
+                sim.loomL = marginal; sim.loomR = marginal; sim.step(400)
+                if sim.consumeGF() { n += 1 }
+            }
+            return n
+        }
+        let dull = escapesAcuity(0.6), normal = escapesAcuity(1.0), sharp = escapesAcuity(1.5)
+        check("difficulty: dull senses escape less, sharp senses more, at the same approach",
+              dull < normal && normal < sharp,
+              String(format: "loom %.2f: dull %d/40, normal %d/40, sharp %d/40", marginal, dull, normal, sharp))
         check("hearing: more escapes at a marginal loom when the room is loud; sound alone stays near silent",
               el > eq + 4 && spurious <= 10,   // measured: 24 -> 34 of 40; ~6 windows per 100 s of max noise
               String(format: "loom %.2f: %d/40 quiet -> %d/40 loud; sound alone: %d GF windows in 100 s", marginal, eq, el, spurious))

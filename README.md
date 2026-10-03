@@ -37,8 +37,10 @@ A 🪰 appears in the menu bar. Everything below lives there.
 ## How to play
 
 - **Squish** — click a grounded fly. Approach slowly: a fast cursor trips the
-  real looming → escape reflex before your click lands. Hitbox: Normal 26 px,
-  Forgiving 34, Tiny 18 (`x`).
+  real looming → escape reflex before your click lands. **Difficulty** (`x`)
+  doesn't change the hitbox (always 26 px); it dulls or sharpens the fly's
+  senses — what reaches its looming detectors and ears. An easy fly is a dull
+  fly, not a scripted one.
 - **Misses are audible — and shown.** Swing and miss near a fly and you'll hear
   a short zip. If the getaway was the real thing — the brain fly's Giant Fiber
   fired before your click — the brain window flashes both Giant Fibers with

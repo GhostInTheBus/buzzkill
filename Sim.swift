@@ -193,6 +193,10 @@ final class LIFSim {
     // synthetic current into GF itself.
     var alert: Float = 0
     var alertGain: Float = 0.026
+    // difficulty: how sharp the fly's senses are. Scales what reaches the
+    // looming detectors and the auditory/wind neurons — the circuit itself is
+    // untouched, so an easy fly is a dull fly, not a scripted one.
+    var senseAcuity: Float = 1
     var attractFwdGain: Float = 0.008   // ~7 Hz DNp09: a nudge, not a shout (>~20 Hz jams the legs)
     var attractTurnGain: Float = 0.02   // visible DNa asymmetry; steering itself is body-level
     var activityScale: Float = 1  // circadian / sleep neuromodulation of baseline+noise
@@ -372,8 +376,8 @@ final class LIFSim {
                 if TestRandom.float(in: 0...1, using: &rng) < p { vi += noiseKick }
                 v[i] = vi
             }
-            if loomL > 0.001 { for i in loomLeft { v[i] += loomL * loomGain * sensoryGate } }
-            if loomR > 0.001 { for i in loomRight { v[i] += loomR * loomGain * sensoryGate } }
+            if loomL > 0.001 { for i in loomLeft { v[i] += loomL * loomGain * sensoryGate * senseAcuity } }
+            if loomR > 0.001 { for i in loomRight { v[i] += loomR * loomGain * sensoryGate * senseAcuity } }
             // body -> brain: gait rhythm into ascending (proprioceptive) neurons
             if locomotor == nil && gaitDrive > 0.001 {
                 let ph = gaitPhase * 2 * Float.pi
@@ -382,7 +386,7 @@ final class LIFSim {
                 }
             }
             // fast air movement near the fly -> sensory pathway
-            if airPuff > 0.001 { for i in sens { v[i] += airPuff * 0.12 * sensoryGate } }
+            if airPuff > 0.001 { for i in sens { v[i] += airPuff * 0.12 * sensoryGate * senseAcuity } }
             // cursor attractant -> DNp09 (walk) + DNa01/02 (steer) + DNg11 (groom)
             if attractDrive > 0.001 {
                 for i in fwd { v[i] += attractDrive * attractFwdGain * sensoryGate }
@@ -390,7 +394,7 @@ final class LIFSim {
                 if turn > 0 { for i in dnaL { v[i] += turn } } else if turn < 0 { for i in dnaR { v[i] -= turn } }
             }
             if attractGroom > 0.001 { for i in groom { v[i] += attractGroom * 0.16 * sensoryGate } }
-            if alert > 0.001 { for i in sens { v[i] += alert * alertGain * sensoryGate } }
+            if alert > 0.001 { for i in sens { v[i] += alert * alertGain * sensoryGate * senseAcuity } }
             // brain-window click stimulation
             for s in activeStims where simMs < s.untilMs {
                 for i in s.idx { v[i] += s.strength }
