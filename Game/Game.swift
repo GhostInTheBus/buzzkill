@@ -11,6 +11,13 @@ final class Game {
     let stats = Stats()
     var attractOn = false
     var sound: FlySound?   // nil = muted (set from the main thread)
+    var hearing: Hearing?  // nil = mic off (set from the main thread)
+
+    /// Sound in the room, 0..1: a typing burst or the mic over ambient.
+    func alert(typing: CGFloat) -> Float {
+        let keys = Float(clampf((typing - 0.5) * 2, 0, 1))
+        return max(keys, hearing?.read() ?? 0)
+    }
 
     private let attractDebug = ProcessInfo.processInfo.environment["DESKTOPFLY_ATTRACT_DEBUG"] != nil
     private var attractDbgClock: CGFloat = 0

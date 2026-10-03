@@ -9,7 +9,7 @@ pest is the **game** and lives in `Game/`, `Senses/` and `Audio/`.
 |---|---|---|
 | engine | `main.swift` (scene, CLI modes, `SignalBuilder`, `Coordinator`, `AppDelegate`), `FlyModel.swift`, `BeetleModel.swift`, `Sim.swift`, `Locomotor.swift`, `LegDynamics.swift`, `LocomotorTests.swift`, `BrainView.swift`, `Environment.swift`, `etl*.py`, `data/` | upstream |
 | game | `Game/Game.swift` (orchestration), `Game/Population.swift` (arrivals, swarms, disperse, spook, shooing, pressure), `Game/Crumbs.swift`, `Game/Squish.swift`, `Game/Attraction.swift` (+ `--attracttest`), `Game/GameUI.swift` (menu, toggles, camera/sound/login, idle pause), `Game/GameWorld.swift` (the protocol the game sees) | this fork |
-| senses | `Senses/CameraSense.swift` (webcam motion by frame differencing), `Senses/HandLoom.swift` (camera motion → loom: expansion = approach, frame side = eye) | this fork |
+| senses | `Senses/Hearing.swift` (mic loudness over ambient), `Senses/CameraSense.swift` (webcam motion by frame differencing), `Senses/HandLoom.swift` (camera motion → loom: expansion = approach, frame side = eye) | this fork |
 | audio | `Audio/FlySound.swift` (synthesized buzz + splat) | this fork |
 | packaging | `package.sh`, `packaging/Info.plist` | this fork |
 
@@ -30,8 +30,9 @@ Keep this list short and current; it is what makes `tools/merge-upstream.sh` pai
 
 **`Sim.swift`**
 - `attractTurn/attractDrive/attractGroom` inputs with `attractFwdGain`/`attractTurnGain`, injected per step into DNa01/02, DNp09, DNg11. Natural DNp09 is ~2 Hz; above ~20 Hz the leg circuit jams — measured, see `--attracttest`.
+- `alert` input (`alertGfGain`): sub-threshold current into GF and the wind-sensory partners while the room is loud. `--populationtest` asserts a loud room alone never fires GF in 4 s and that the loom threshold drops when primed.
 
-**`build.sh`**: the three new directories and `-framework AVFoundation -framework Vision`.
+**`build.sh`**: the three new directories, `-framework AVFoundation`, and upstream PR #18's flags `-wmo -enforce-exclusivity=unchecked` (locomotortest 8.7 s → 2.5 s here; live CPU 41% → 28% with one fly).
 
 ## Verifying after a change
 

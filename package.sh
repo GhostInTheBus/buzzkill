@@ -11,7 +11,7 @@ if [[ " $* " == *" --universal "* ]]; then
   SRCS=(main.swift FlyModel.swift LegDynamics.swift Locomotor.swift LocomotorTests.swift BeetleModel.swift Sim.swift BrainView.swift Environment.swift Game/*.swift Senses/*.swift Audio/*.swift)
   FW=(-framework Cocoa -framework SceneKit -framework AVFoundation)
   for arch in arm64 x86_64; do
-    swiftc -module-cache-path "${TMPDIR:-/tmp}/desktopfly-module-cache-$arch" -O -swift-version 5 \
+    swiftc -module-cache-path "${TMPDIR:-/tmp}/desktopfly-module-cache-$arch" -O -wmo -enforce-exclusivity=unchecked -swift-version 5 \
       -target "$arch-apple-macos13.0" -o "Buzzkill-$arch" "${SRCS[@]}" "${FW[@]}"
   done
   lipo -create -output Buzzkill Buzzkill-arm64 Buzzkill-x86_64 && rm -f Buzzkill-arm64 Buzzkill-x86_64

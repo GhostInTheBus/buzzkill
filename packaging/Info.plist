@@ -15,6 +15,7 @@
 	<key>LSMinimumSystemVersion</key><string>13.0</string>
 	<key>LSUIElement</key><true/>
 	<key>NSHighResolutionCapable</key><true/>
+	<key>NSMicrophoneUsageDescription</key><string>Hearing lets loud moments put the fly on alert. Only a loudness level is read; no audio is kept or sent anywhere.</string>
 	<key>NSCameraUsageDescription</key><string>Camera Swat watches for a hand swatting at the fly. Frames are analyzed on this Mac and never stored or sent anywhere.</string>
 </dict>
 </plist>

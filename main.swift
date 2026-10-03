@@ -766,6 +766,7 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
     func setAttract(_ on: Bool) { enqueue { $0.game.attractOn = on } }
     func setSquish(_ on: Bool) { enqueue { $0.game.splats.enabled = on } }
     func setSound(_ s: FlySound?) { enqueue { $0.game.sound = s } }
+    func setHearing(_ h: Hearing?) { enqueue { $0.game.hearing = h } }
     func trySquish(at p: CGPoint) { enqueue { c in c.game.squish(at: p, world: c) } }
     func pickUpCrumb() { enqueue { c in c.game.crumbs.pickUp(world: c, at: c.mouseScene ?? .zero) } }
     func placeHeldCrumb(at p: CGPoint) { enqueue { c in c.game.crumbs.place(world: c, at: p) } }
@@ -911,6 +912,7 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
             sim.loomL = max(sensory.l, handS.l, windowLoomL)
             sim.loomR = max(sensory.r, handS.r, windowLoomR)
             sim.airPuff = max(sensory.puff, handS.puff, Float(typingLevel * 0.30))
+            sim.alert = game.alert(typing: typingLevel)
             game.drive(sim: sim, world: self, mouse: mouse, dt: dt)
             // body -> brain: leg proprioception from the current gait
             sim.gaitDrive = Float(first.walkingIntensity)

@@ -125,6 +125,33 @@ func runPopulationTest() {
               String(format: "%.0f s, pressure %.2f -> %.2f", t, before, g.population.pressure))
     }
 
+    // --- hearing primes the Giant Fiber without ever firing it by itself ---
+    if let data = loadBrainData() {
+        func gfFires(alert: Float, loom: Float) -> Bool {
+            TestRandom.reset("hearing \(alert) \(loom)")
+            let sim = LIFSim(circuit: data.circuit, spikeBus: nil)
+            sim.step(400); _ = sim.consumeGF()
+            sim.alert = alert
+            sim.step(4000)                      // 4 s of a loud room, nothing approaching
+            let quiet = !sim.consumeGF()
+            sim.loomL = loom; sim.loomR = loom  // then an abrupt, modest loom
+            sim.step(60)
+            return !quiet ? true : sim.consumeGF() ? true : false
+        }
+        let restFires = !(["x"].isEmpty) && { () -> Bool in
+            TestRandom.reset("hearing rest"); let sim = LIFSim(circuit: data.circuit, spikeBus: nil)
+            sim.step(400); _ = sim.consumeGF(); sim.alert = 1; sim.step(4000); return sim.consumeGF() }()
+        // find the smallest loom that tips GF, primed vs. not
+        func threshold(alert: Float) -> Float {
+            for l in stride(from: Float(0.05), through: 1.0, by: 0.05) where gfFires(alert: alert, loom: l) { return l }
+            return 2
+        }
+        let tQuiet = threshold(alert: 0), tLoud = threshold(alert: 1)
+        check("hearing: a loud room alone never fires GF (4 s)", !restFires, "fired \(restFires)")
+        check("hearing: primed GF needs a smaller loom", tLoud < tQuiet,
+              String(format: "loom threshold quiet %.2f -> loud %.2f", tQuiet, tLoud))
+    }
+
     UserDefaults.standard.removeObject(forKey: "popPressure")
     UserDefaults.standard.removeObject(forKey: "popPressureAt")
     print(failures == 0 ? "ALL POPULATION TESTS PASS" : "\(failures) POPULATION FAILURES")

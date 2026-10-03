@@ -12,9 +12,10 @@ final class GameUI: NSObject {
     private var coordinator: Coordinator { app.coordinator }
 
     // persisted toggles
-    static let attractKey = "attractCursor", squishKey = "squishClick", soundKey = "flySound", cameraKey = "cameraSwat"
-    private(set) var attractOn = false, squishOn = true, soundOn = true, cameraOn = false
-    private var attractItem, squishItem, soundItem, cameraItem, loginItem, statsItem, hitboxItem: NSMenuItem?
+    static let attractKey = "attractCursor", squishKey = "squishClick", soundKey = "flySound", cameraKey = "cameraSwat", hearingKey = "hearingMic"
+    private(set) var attractOn = false, squishOn = true, soundOn = true, cameraOn = false, hearingOn = false
+    private var attractItem, squishItem, soundItem, cameraItem, loginItem, statsItem, hitboxItem, hearingItem: NSMenuItem?
+    private var hearing: Hearing?
     static let hitboxKey = "hitbox"
     private static let hitboxes: [(name: String, px: CGFloat)] = [("Normal", 26), ("Forgiving", 34), ("Tiny", 18)]
     private var hitboxIndex = 0
@@ -62,6 +63,9 @@ final class GameUI: NSObject {
         cameraItem = item("Camera Swat: Off", #selector(toggleCamera), "c")
         menu.addItem(cameraItem!)
         refreshCameraItem()
+        hearingItem = item("Hearing (mic): Off", #selector(toggleHearing), "g")
+        menu.addItem(hearingItem!)
+        refreshHearingItem()
         autoPauseItem = item("Pause When Idle: 10 min", #selector(cycleAutoPause), "i")
         menu.addItem(autoPauseItem!)
     }
@@ -83,6 +87,7 @@ final class GameUI: NSObject {
         setSquish(d.object(forKey: GameUI.squishKey) as? Bool ?? true)
         setSound(d.object(forKey: GameUI.soundKey) as? Bool ?? true)
         if d.bool(forKey: GameUI.cameraKey), CameraSense.authorization == .authorized { startCamera() }
+        if d.bool(forKey: GameUI.hearingKey), Hearing.authorization == .authorized { startHearing() }
         setHitbox(d.integer(forKey: GameUI.hitboxKey))
         setAutoPause(minutes: d.object(forKey: GameUI.autoPauseKey) as? Int ?? 10)
     }
@@ -136,9 +141,11 @@ final class GameUI: NSObject {
         coordinator.lastTime = nil
         if on {
             if cameraOn { cameraSense?.stop() }
+            if hearingOn { hearing?.stop() }
             flySound?.stop()
         } else {
             if cameraOn { _ = cameraSense?.start() }
+            if hearingOn { _ = hearing?.start() }
             if soundOn { flySound?.start() }
             // let the cap know how long we were gone, then fill in the arrivals
             coordinator.setAmbient(typing: 0, sleepy: false, tempo: thermalTempo(),
@@ -210,7 +217,41 @@ final class GameUI: NSObject {
         }
     }
 
-    // MARK: camera (the one sense that needs a permission)
+    // MARK: hearing (mic; typing bursts work without it)
+
+    @objc func toggleHearing() {
+        if hearingOn {
+            hearing?.stop(); hearingOn = false
+            coordinator.setHearing(nil)
+            UserDefaults.standard.set(false, forKey: GameUI.hearingKey)
+            refreshHearingItem(); return
+        }
+        switch Hearing.authorization {
+        case .authorized: startHearing()
+        case .notDetermined:
+            Hearing.requestAccess { [weak self] ok in if ok { self?.startHearing() } else { self?.refreshHearingItem() } }
+        default:
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
+                NSWorkspace.shared.open(url)
+            }
+        }
+    }
+    private func startHearing() {
+        let h = hearing ?? Hearing()
+        hearing = h
+        hearingOn = h.start()
+        coordinator.setHearing(hearingOn ? h : nil)
+        UserDefaults.standard.set(hearingOn, forKey: GameUI.hearingKey)
+        refreshHearingItem()
+    }
+    private func refreshHearingItem() {
+        switch Hearing.authorization {
+        case .denied, .restricted: hearingItem?.title = "Hearing (mic): No Access (open Settings)"
+        default: hearingItem?.title = hearingOn ? "Hearing (mic): On" : "Hearing (mic): Off"
+        }
+    }
+
+    // MARK: camera (a sense that needs a permission)
 
     @objc func toggleCamera() {
         if cameraOn {

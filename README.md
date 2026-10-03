@@ -57,6 +57,11 @@ A 🪰 appears in the menu bar. Everything below lives there.
   something approaching), the half of the frame it's in picks the eye, a fast
   sweep is wind. Lunge at the screen and the Giant Fiber fires. On-device,
   frames compared and dropped. The one feature that needs a permission.
+- **Hearing** — loud moments prime the escape circuit: a typing burst (always
+  on, permission-free) or, with **Hearing (mic)** on (`g`), the room's loudness
+  over its own ambient level. Primed, the Giant Fiber sits closer to threshold
+  and a slower approach tips it. Stalk quietly. The mic path reads one
+  loudness number per buffer; no audio is kept.
 - **Stats** at the top of the menu: squished, got away, peak swarm, longest
   absence.
 
