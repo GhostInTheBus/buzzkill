@@ -872,7 +872,7 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
     func trySquish(at p: CGPoint) {
         enqueue { c in
             guard c.squishOn else { return }
-            guard let i = c.flies.firstIndex(where: { $0.state != .flying && hypot(p.x - $0.pos.x, p.y - $0.pos.y) < 34 })
+            guard let i = c.flies.firstIndex(where: { $0.state != .flying && hypot(p.x - $0.pos.x, p.y - $0.pos.y) < 26 })
             else { return }
             let fly = c.flies.remove(at: i)
             c.sound?.splat()
