@@ -29,6 +29,7 @@ final class Game {
 
     init() {
         crumbs.onFinished = { [weak self] in self?.population.bumpPressure(-0.15); self?.stats.noteCrumb() }
+        crumbs.onPlaced = { [weak self] in self?.population.noteCrumbPlaced() }
     }
 
     /// A click on the desktop: squish if a grounded fly is under it.

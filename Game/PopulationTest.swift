@@ -126,6 +126,31 @@ func runPopulationTest() {
               String(format: "%.0f s, pressure %.2f -> %.2f", t, before, g.population.pressure))
     }
 
+    // --- crumbs draw a crowd that stays ---
+    do {
+        TestRandom.reset("population crumb draw")
+        let g = Game(); let w = StubWorld()
+        for _ in 0..<4 { g.population.spawnFromEdge(world: w) }
+        for f in w.flies { f.update(dt: 5, bounds: w.bounds, mouse: nil, signals: nil) }
+        g.crumbs.pickUp(world: w, at: .zero); g.crumbs.place(world: w, at: CGPoint(x: 0, y: 0))
+        g.crumbs.pickUp(world: w, at: .zero); g.crumbs.place(world: w, at: CGPoint(x: 80, y: 0))
+        var t: CGFloat = 0, sevenAt: CGFloat = -1
+        while t < 90 {
+            g.population.update(world: w, dt: 0.1, idle: 1, mouse: nil, mouseSpeed: 0, handSpeed: 0)
+            for f in w.flies where f.state == .flying { f.update(dt: 5, bounds: w.bounds, mouse: nil, signals: nil) }
+            if sevenAt < 0 && w.flies.count >= 7 { sevenAt = t }
+            t += 0.1
+        }
+        let peak = w.flies.count
+        // user steps away and comes back: the crumb crowd is not scattered
+        g.population.update(world: w, dt: 0.1, idle: 120, mouse: nil, mouseSpeed: 0, handSpeed: 0)
+        g.population.update(world: w, dt: 0.1, idle: 1, mouse: .zero, mouseSpeed: 0, handSpeed: 0)
+        let leaving = w.flies.filter { $0.state == .flying }.count
+        check("crumbs: two crumbs draw six more flies at the desk within a minute; they stay on return",
+              sevenAt >= 0 && sevenAt < 30 && peak == 10 && leaving <= 1,
+              String(format: "7 flies at %.0f s, settled %d, leaving on return %d", sevenAt, peak, leaving))
+    }
+
     // --- "the brain beat you" is only claimed when true ---
     do {
         TestRandom.reset("population miss")

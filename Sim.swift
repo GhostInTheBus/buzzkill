@@ -103,9 +103,11 @@ func findDataDir() -> URL? {
     let fm = FileManager.default
     let exeDir = URL(fileURLWithPath: CommandLine.arguments[0])
         .resolvingSymlinksInPath().deletingLastPathComponent()
+    // BUZZKILL_DATA=<dir> selects an alternate extract (e.g. data-malecns) for testing
+    let name = ProcessInfo.processInfo.environment["BUZZKILL_DATA"] ?? "data"
     let candidates = [
-        exeDir.appendingPathComponent("data"),
-        URL(fileURLWithPath: fm.currentDirectoryPath).appendingPathComponent("data"),
+        name.hasPrefix("/") ? URL(fileURLWithPath: name) : exeDir.appendingPathComponent(name),
+        URL(fileURLWithPath: fm.currentDirectoryPath).appendingPathComponent(name),
     ]
     return candidates.first { fm.fileExists(atPath: $0.appendingPathComponent("circuit.json").path) }
 }

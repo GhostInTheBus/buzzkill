@@ -16,6 +16,16 @@ final class Population {
     private var scheduledAway = false   // which regime the pending wait was drawn from
     private var shake: CGFloat = 0
     private(set) var spooked = false
+    /// Crumbs draw a crowd: each crumb dropped adds room for three more flies
+    /// (up to +12), who arrive within seconds and stay. Fades by one every 5 min.
+    private(set) var crumbDraw: CGFloat = 0
+    /// The population the desk settles at right now (home + what crumbs drew in).
+    var settled: Int { homeFlies + Int(crumbDraw.rounded(.up)) }
+
+    func noteCrumbPlaced() {
+        crumbDraw = min(12, crumbDraw + 3)
+        nextSpawnIn = min(nextSpawnIn, spawnTimer + rnd(1.5...4))   // word gets around fast
+    }
     private(set) var idle: CGFloat = 0
 
     // Squishing slows arrivals, finished crumbs speed them up. Persisted,
@@ -38,7 +48,7 @@ final class Population {
     /// ~95 after an hour, 160 by 1h45) so any extended absence builds a swarm.
     var maxFlies: Int {
         if let n = swarmTest { return n }
-        return idle > 60 ? min(160, homeFlies + Int(idle / 60 * 1.5)) : homeFlies
+        return idle > 60 ? min(160, settled + Int(idle / 60 * 1.5)) : settled
     }
 
     func scheduleNextSpawn(_ base: ClosedRange<CGFloat>? = nil, count: Int) {
@@ -50,6 +60,8 @@ final class Population {
         let away = idle > 60
         var wait = rnd(base ?? (away ? 20...50 : 90...240)) * (1 + pressure)
         if away { wait = max(5, wait * pow(0.92, CGFloat(count))) }
+        // seats opened by a crumb fill quickly, whatever else is going on
+        if base == nil && crumbDraw > 0 && count < settled && count >= homeFlies { wait = rnd(3...8) }
         nextSpawnIn = wait
     }
 
@@ -61,7 +73,7 @@ final class Population {
 
     /// The user is back: anything beyond the home population scatters off screen.
     func disperse(world: GameWorld, from p: CGPoint?) {
-        let extra = world.flies.count - homeFlies
+        let extra = world.flies.count - settled
         guard extra > 0 else { return }
         let threat = p ?? .zero
         // keep the brain fly (index 0); send a random `extra` of the rest away
@@ -109,6 +121,7 @@ final class Population {
     /// Per frame. `mouseSpeed`/`handSpeed` in scene px/s.
     func update(world: GameWorld, dt: CGFloat, idle: CGFloat, mouse: CGPoint?, mouseSpeed: CGFloat, handSpeed: CGFloat) {
         self.idle = idle
+        crumbDraw = max(0, crumbDraw - dt / 300)
         // shooed flies that made it off screen
         if world.flies.contains(where: { $0.gone }) {
             world.flies.removeAll { if $0.gone { $0.node.removeFromParentNode(); return true }; return false }

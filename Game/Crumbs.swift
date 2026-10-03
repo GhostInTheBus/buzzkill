@@ -8,6 +8,8 @@ final class Crumbs {
     private var held: SCNNode?
     /// Called once per crumb eaten to nothing.
     var onFinished: (() -> Void)?
+    /// Called when a carried crumb is dropped.
+    var onPlaced: (() -> Void)?
 
     var isHolding: Bool { held != nil }
 
@@ -24,6 +26,7 @@ final class Crumbs {
         n.position = SCNVector3(p.x, p.y, 0.3)
         crumbs.append((n, p, 1))
         held = nil
+        onPlaced?()
     }
 
     func nearest(to fly: Fly) -> CGPoint? {

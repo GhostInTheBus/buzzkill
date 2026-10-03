@@ -50,7 +50,10 @@ A 🪰 appears in the menu bar. Everything below lives there.
 - **Watch the brain** (`b`) — 23,210 real soma positions, with the 668
   simulated neurons spiking live. Click a region to stimulate it, drag to
   orbit, scroll to zoom, `f` for fullscreen, `e` for an escape test.
-- **Crumbs** (`m`) — carry one on the cursor, click to drop. Every fly comes.
+- **Crumbs** (`m`) — carry one on the cursor, click to drop. Every fly comes,
+  and more arrive from off-screen: each crumb makes room for three extra flies
+  (up to +12) who show up within seconds and stay. That's how you raise a crowd
+  on purpose. The extra room fades by one every five minutes.
 - **Attract to Cursor** (`t`) — park the cursor; the fly flies over and grooms.
 - **It stops when you do.** Idle a minute: 30 fps. Idle ten minutes (`i`:
   5/10/30/60): rendering, brain sim, camera and sound all stop — nothing burns
