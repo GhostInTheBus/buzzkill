@@ -43,6 +43,10 @@ A 🪰 appears in the menu bar. Everything below lives there.
   it saw you.
 - **Crumbs** (`m`) — carry one on the cursor, click to drop. Every fly comes.
 - **Attract to Cursor** (`t`) — park the cursor; the fly flies over and grooms.
+- **It stops when you do.** Idle a minute: 30 fps. Idle ten minutes (`i`:
+  5/10/30/60): rendering, brain sim, camera and sound all stop — nothing burns
+  while you sleep. The display waking (or any input) resumes it, and the
+  flies that would have arrived stream in from the edges.
 - **Swarms while you're away.** At the desk: a fly every few minutes, up to 4.
   Idle a minute or more: the cap climbs about 1.5 a minute, to 160. Come back
   and your first input scatters everything beyond 4. Shake the cursor hard

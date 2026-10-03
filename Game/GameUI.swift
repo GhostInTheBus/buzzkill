@@ -23,9 +23,16 @@ final class GameUI: NSObject {
     private var cameraSense: CameraSense?
     private var holdingCrumb = false
 
-    // idle pause: after an hour without input, stop rendering (GPU) until wake/input
+    // idle pause: after a few minutes without input, stop rendering and the sim
+    // (GPU/CPU idle) until the display wakes or input returns. The swarm is
+    // computed from idle time and streams in on resume, so pausing early costs
+    // nothing. Also: 30 fps once the user has been away a minute.
     private(set) var autoPaused = false
-    static let autoPauseAfter: Double = 3600
+    static let autoPauseKey = "autoPauseMinutes"
+    private static let pauseChoices = [5, 10, 30, 60]
+    private var autoPauseMinutes = 10
+    private var autoPauseItem: NSMenuItem?
+    private var lowFps = false
 
     // MARK: menu
 
@@ -55,6 +62,18 @@ final class GameUI: NSObject {
         cameraItem = item("Camera Swat: Off", #selector(toggleCamera), "c")
         menu.addItem(cameraItem!)
         refreshCameraItem()
+        autoPauseItem = item("Pause When Idle: 10 min", #selector(cycleAutoPause), "i")
+        menu.addItem(autoPauseItem!)
+    }
+
+    @objc func cycleAutoPause() {
+        let i = GameUI.pauseChoices.firstIndex(of: autoPauseMinutes) ?? 1
+        setAutoPause(minutes: GameUI.pauseChoices[(i + 1) % GameUI.pauseChoices.count])
+    }
+    private func setAutoPause(minutes: Int) {
+        autoPauseMinutes = GameUI.pauseChoices.contains(minutes) ? minutes : 10
+        UserDefaults.standard.set(autoPauseMinutes, forKey: GameUI.autoPauseKey)
+        autoPauseItem?.title = "Pause When Idle: \(autoPauseMinutes) min"
     }
 
     /// Apply persisted settings at launch.
@@ -65,6 +84,7 @@ final class GameUI: NSObject {
         setSound(d.object(forKey: GameUI.soundKey) as? Bool ?? true)
         if d.bool(forKey: GameUI.cameraKey), CameraSense.authorization == .authorized { startCamera() }
         setHitbox(d.integer(forKey: GameUI.hitboxKey))
+        setAutoPause(minutes: d.object(forKey: GameUI.autoPauseKey) as? Int ?? 10)
     }
 
     /// Called when the menu is about to open.
@@ -95,8 +115,11 @@ final class GameUI: NSObject {
     /// (callers should feed it nothing, so actions don't pile up).
     func idleTick(idleNow: Double) -> Bool {
         if !app.paused {
-            if !autoPaused && idleNow > GameUI.autoPauseAfter { setAutoPaused(true, idle: idleNow) }
+            if !autoPaused && idleNow > Double(autoPauseMinutes * 60) { setAutoPaused(true, idle: idleNow) }
             else if autoPaused && idleNow < 3 { setAutoPaused(false, idle: idleNow) }
+            // nobody's watching: half the frames (the sim keeps its own clock)
+            let wantLow = idleNow > 60 && !autoPaused
+            if wantLow != lowFps { lowFps = wantLow; app.scnView.preferredFramesPerSecond = wantLow ? 30 : 120 }
         }
         return autoPaused
     }
