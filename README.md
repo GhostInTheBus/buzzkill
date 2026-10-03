@@ -144,7 +144,7 @@ that the behavior comes from real wiring.
   circuit first.
 - **Swarms while you're away** — newcomers fly in from a screen edge. At the
   desk: every 1.5–4 minutes, up to 4. Idle a minute or more: the cap climbs
-  with time gone (about 0.6 per minute, to 160 overnight) and flies attract
+  with time gone (1.5 per minute: ~50 after half an hour, ~95 after an hour, 160 by 1h45) and flies attract
   flies — each one present shortens the next wait 8%, floor 5 s. Squishing
   raises a persisted "population pressure" that slows arrivals; it decays over
   a day. Stress-tested at 240 flies: 120 fps, ~60% of one core.

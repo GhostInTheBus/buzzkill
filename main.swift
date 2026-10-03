@@ -800,10 +800,11 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
     private let swarmTest = ProcessInfo.processInfo.environment["DESKTOPFLY_SWARM_TEST"].flatMap { Int($0) ?? 48 }
     // the "appropriate" population when you're at the desk
     private let homeFlies = 4
-    // away: the cap climbs with time gone (~0.6/min), so overnight is a proper swarm
+    // away: the cap climbs with time gone (1.5/min: ~50 after half an hour, ~95
+    // after an hour, 160 by 1h45) so any extended absence builds a swarm
     private var maxFlies: Int {
         if let n = swarmTest { return n }
-        return userIdle > 60 ? min(160, homeFlies + Int(userIdle / 60 * 0.6)) : homeFlies
+        return userIdle > 60 ? min(160, homeFlies + Int(userIdle / 60 * 1.5)) : homeFlies
     }
     var sound: FlySound?   // nil = muted (set from the main thread via setSound)
     // crumbs: food the user drops; every fly converges and feeds, the crumb shrinks
