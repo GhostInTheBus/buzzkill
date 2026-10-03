@@ -172,7 +172,7 @@ that the behavior comes from real wiring.
   pathway as the cursor, so a swat at the screen triggers the real giant-fiber
   escape. The one feature that needs a permission (Camera).
 
-Diagnostics added: `./DesktopFly --attracttest` (headless gain sweep with the
+Diagnostics added: `./DesktopFly --populationtest` (game rules, headless), `./DesktopFly --attracttest` (headless gain sweep with the
 locomotor active; `FWD`, `TURN`, `SECS`, `ATTRACT=0` env vars) and
 `DESKTOPFLY_ATTRACT_DEBUG=1` for a per-second brain/body readout.
 

@@ -13,6 +13,7 @@ final class Population {
     private var spawnTimer: CGFloat = 0
     private lazy var nextSpawnIn: CGFloat = swarmTest != nil ? 1 : rnd(60...240)
     private var wasAway = false
+    private var scheduledAway = false   // which regime the pending wait was drawn from
     private var shake: CGFloat = 0
     private(set) var spooked = false
     private(set) var idle: CGFloat = 0
@@ -42,6 +43,7 @@ final class Population {
 
     func scheduleNextSpawn(_ base: ClosedRange<CGFloat>? = nil, count: Int) {
         spawnTimer = 0
+        scheduledAway = idle > 60
         if swarmTest != nil { nextSpawnIn = 1; return }
         // at the desk: a new fly every 1.5-4 min. Away: 20-50 s, and flies attract
         // flies — each one present shortens the wait by 8%, floor 5 s.
@@ -124,6 +126,8 @@ final class Population {
         // a crowd scatters more readily than a lone fly
         let chance = clampf(0.25 + 0.06 * CGFloat(world.flies.count), 0, 0.85)
         for fly in world.flies { fly.leaveChance = chance }
+        // the regime flipped (left the desk / came back): redraw the pending wait
+        if (idle > 60) != scheduledAway { scheduledAway = idle > 60; scheduleNextSpawn(count: world.flies.count) }
         // arrivals, up to the cap
         spawnTimer += dt
         if !spooked && world.flies.count < maxFlies && spawnTimer >= nextSpawnIn {

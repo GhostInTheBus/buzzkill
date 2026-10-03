@@ -1199,6 +1199,7 @@ if args.contains("--simtest") {
     runSimtest()
 }
 if args.contains("--attracttest") { runAttractTest(); exit(0) }
+if args.contains("--populationtest") { runPopulationTest() }
 if args.contains("--behaviortest") {
     runBehaviorTest()
 }

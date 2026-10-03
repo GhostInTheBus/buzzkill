@@ -39,6 +39,7 @@ Keep this list short and current; it is what makes `tools/merge-upstream.sh` pai
 ./build.sh
 ./DesktopFly --simtest && ./DesktopFly --behaviortest && ./DesktopFly --locomotortest
 SECS=30 ./DesktopFly --attracttest          # should arrive in a few seconds
+./DesktopFly --populationtest               # game rules: cap curve, arrivals, disperse, spook, squish, crumbs
 DESKTOPFLY_SWARM_TEST=40 DESKTOPFLY_FPS=1 ./DesktopFly   # 120 fps expected
 ```
 

@@ -42,6 +42,7 @@ models. Do not claim biologically calibrated walking from anatomical checks.
 ```
 
 Also in this fork: `./DesktopFly --attracttest` (headless attraction harness),
+`./DesktopFly --populationtest` (game rules),
 `DESKTOPFLY_SWARM_TEST=N` (stress), `DESKTOPFLY_ATTRACT_DEBUG=1`.
 
 Run **all three** suites after changes to simulation, extraction or behavior,
