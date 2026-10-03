@@ -23,6 +23,8 @@ models. Do not claim biologically calibrated walking from anatomical checks.
 | `etl.py` | raw Codex dumps → `data/brain_points.json` + `data/circuit.json` |
 | `etl_malecns.py` | public MaleCNS Feather tables → `data/locomotor_circuit.json` + `data/locomotor_report.json` |
 | `data/` | FlyWire CC BY-NC 4.0 and MaleCNS CC BY 4.0 data; see `DATA_LICENSE.md` and `LOCOMOTOR_PROVENANCE.md` |
+| `Game/`, `Senses/`, `Audio/` | **this fork's game layer** — pest behavior (arrivals, crumbs, squish, attraction, spook), webcam hand sense, synthesized sound, menu/toggles. See `ENGINE.md` for the boundary and the few engine touch points. |
+| `package.sh`, `packaging/` | .app bundle build (`./package.sh --install`) |
 
 ## Build, run, verify
 
@@ -38,6 +40,9 @@ models. Do not claim biologically calibrated walking from anatomical checks.
 ./DesktopFly --brainshot b.png # offscreen brain render
 ./DesktopFly --snapshot walk.png --top --walking # pose driven by active motor neurons
 ```
+
+Also in this fork: `./DesktopFly --attracttest` (headless attraction harness),
+`DESKTOPFLY_SWARM_TEST=N` (stress), `DESKTOPFLY_ATTRACT_DEBUG=1`.
 
 Run **all three** suites after changes to simulation, extraction or behavior,
 and `npm test` in `windows/` for the corresponding three JS suites. They check software
