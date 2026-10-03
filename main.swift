@@ -793,7 +793,8 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
     private var sceneTime: TimeInterval = 0
     private var spawnTimer: CGFloat = 0
     private var nextSpawnIn: CGFloat = rnd(60...240)
-    private let maxFlies = 3
+    private var userIdle: CGFloat = 0        // seconds since the user last touched anything
+    private var maxFlies: Int { userIdle > 60 ? 12 : 4 }   // they gather while you're away
     var sound: FlySound?   // nil = muted (set from the main thread via setSound)
     // crumbs: food the user drops; every fly converges and feeds, the crumb shrinks
     private var crumbs: [(node: SCNNode, pos: CGPoint, amount: CGFloat)] = []
@@ -811,9 +812,10 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
         UserDefaults.standard.set(Double(pressure), forKey: "popPressure")
         UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "popPressureAt")
     }
-    private func scheduleNextSpawn(_ base: ClosedRange<CGFloat> = 60...240) {
+    private func scheduleNextSpawn(_ base: ClosedRange<CGFloat>? = nil) {
         spawnTimer = 0
-        nextSpawnIn = rnd(base) * (1 + pressure)
+        // away from the desk: a new fly every 25-70 s; at it: every 1.5-4 min
+        nextSpawnIn = rnd(base ?? (userIdle > 60 ? 25...70 : 90...240)) * (1 + pressure)
     }
     private let attractDebug = ProcessInfo.processInfo.environment["DESKTOPFLY_ATTRACT_DEBUG"] != nil
     private var attractDbgClock: CGFloat = 0
@@ -969,9 +971,9 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
             }
         }
     }
-    func setAmbient(typing: CGFloat, sleepy: Bool, tempo: CGFloat, activity: Float) {
+    func setAmbient(typing: CGFloat, sleepy: Bool, tempo: CGFloat, activity: Float, idle: CGFloat = 0) {
         enqueue { c in
-            c.typingLevel = typing; c.sleepy = sleepy; c.tempo = tempo; c.activity = activity
+            c.typingLevel = typing; c.sleepy = sleepy; c.tempo = tempo; c.activity = activity; c.userIdle = idle
         }
     }
     func flyPosition() -> CGPoint { lock.lock(); defer { lock.unlock() }; return lastFlyPos }
@@ -1135,6 +1137,14 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
                 snd.setBuzz(level: 0, pitch: 1, pan: 0)
             }
         }
+        // shooed flies that made it off screen
+        if flies.contains(where: { $0.gone }) {
+            flies.removeAll { if $0.gone { $0.node.removeFromParentNode(); return true }; return false }
+            if flies.isEmpty { scheduleNextSpawn(8...30) }
+        }
+        // a crowd scatters more readily than a lone fly
+        let chance = clampf(0.25 + 0.06 * CGFloat(flies.count), 0, 0.85)
+        for fly in flies { fly.leaveChance = chance }
         // random arrivals, up to maxFlies
         spawnTimer += dt
         if flies.count < maxFlies && spawnTimer >= nextSpawnIn {
@@ -1340,7 +1350,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let h = Double(comps.hour ?? 12) + Double(comps.minute ?? 0) / 60
             let sleepy = (idle > 600 && (h >= 22 || h < 6)) || idle > 1800
             self.coordinator.setAmbient(typing: self.typingLevel, sleepy: sleepy,
-                                        tempo: thermalTempo(), activity: circadianActivity(hour: h))
+                                        tempo: thermalTempo(), activity: circadianActivity(hour: h),
+                                        idle: CGFloat(idle))
         }
 
         // window terrain + new-window looms, ~1.4 Hz

@@ -377,6 +377,11 @@ final class Fly {
     var heading: CGFloat = rnd(0...(2 * .pi))
     // scene point the fly is drawn toward while walking (cursor attractant), or nil
     var attractTarget: CGPoint?
+    // shooing: chance (set by the coordinator from crowd size) that an escape
+    // from a threat leaves the screen for good instead of landing elsewhere
+    var leaveChance: CGFloat = 0
+    private(set) var leaving = false
+    private(set) var gone = false
     private var attractGrounded: CGFloat = 0   // seconds on the ground since the last hop
     private var attractCooldown: CGFloat = 0
 
@@ -503,6 +508,17 @@ final class Fly {
                 break
             }
         }
+        // shooed: keep going in the away direction until off the screen
+        if let a = awayFrom, toward == nil, rnd(0...1) < leaveChance {
+            var dir = CGPoint(x: pos.x - a.x, y: pos.y - a.y)
+            let len = hypot(dir.x, dir.y)
+            if len < 1 { let ang = rnd(0...(2 * CGFloat.pi)); dir = CGPoint(x: cos(ang), y: sin(ang)) }
+            else { dir = CGPoint(x: dir.x / len, y: dir.y / len) }
+            let reach = max(bounds.width, bounds.height)
+            target = CGPoint(x: clampf(pos.x + dir.x * reach, -(hw + 160), hw + 160),
+                             y: clampf(pos.y + dir.y * reach, -(hh + 160), hh + 160))
+            leaving = true
+        }
         flightTo = target
         let dist = hypot(target.x - pos.x, target.y - pos.y)
         flightDur = escape ? clampf(dist / 650, 0.45, 1.2) : clampf(dist / 420, 0.7, 2.0)
@@ -514,6 +530,7 @@ final class Fly {
     }
 
     private func land() {
+        if leaving { gone = true; node.isHidden = true; return }   // off screen: the coordinator removes it
         setState(.idle)
         stateTimer = rnd(0.3...0.8)
         speed = 0

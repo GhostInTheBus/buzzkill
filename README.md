@@ -140,9 +140,14 @@ that the behavior comes from real wiring.
 - **Squish on Click** (`k`, on) — click a grounded fly and it becomes a splat
   with the flattened fly in it, solid for 2.5 minutes, fading over the next.
   You have to earn it: a fast cursor trips the real escape circuit first.
-- **Random arrivals** — up to 3 flies; newcomers fly in from a screen edge every
-  1–4 minutes (8–30 s if you squished the last one). Squishing raises a
-  persisted "population pressure" that slows arrivals; it decays over a day.
+- **Arrivals while you're away** — newcomers fly in from a screen edge. At the
+  desk: every 1.5–4 minutes, up to 4 flies. Idle for a minute or more: every
+  25–70 s, up to 12 — how many you find tells you how long you were gone.
+  Squishing raises a persisted "population pressure" that slows arrivals; it
+  decays over a day.
+- **Shooing** — when a fly escapes your cursor or hand it may keep going and
+  leave the screen for good instead of landing elsewhere (25% alone, up to 85%
+  in a crowd). Clear a swarm by chasing it.
 - **Sound** (`u`, on, quiet) — a synthesized wingbeat buzz while a fly is
   airborne (pitch follows effort, panned to its position) and a splat on squish.
   No audio files; everything is generated in `FlySound.swift`.
