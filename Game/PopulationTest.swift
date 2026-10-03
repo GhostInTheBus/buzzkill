@@ -11,6 +11,7 @@ private final class StubWorld: GameWorld {
     let bounds = CGSize(width: 1512, height: 982)
     let scene = SCNScene()
     var startles = 0
+    var brainEscapeAge: CGFloat = 99
     func startle(_ strength: CGFloat) { startles += 1 }
 }
 
@@ -125,6 +126,23 @@ func runPopulationTest() {
               String(format: "%.0f s, pressure %.2f -> %.2f", t, before, g.population.pressure))
     }
 
+    // --- "the brain beat you" is only claimed when true ---
+    do {
+        TestRandom.reset("population miss")
+        let g = Game(); let w = StubWorld()
+        g.population.spawnFromEdge(world: w)            // arrives flying
+        let brain = w.flies[0]
+        var got: [CGFloat?] = []
+        g.onMiss = { got.append($0) }
+        w.brainEscapeAge = 0.3
+        g.squish(at: CGPoint(x: brain.pos.x + 60, y: brain.pos.y), world: w)   // airborne, GF fired 0.3 s ago
+        w.brainEscapeAge = 99
+        g.squish(at: CGPoint(x: brain.pos.x + 60, y: brain.pos.y), world: w)   // airborne, but no GF spike
+        let ok = got.count == 2 && got[0] != nil && abs(got[0]! - 0.3) < 1e-6 && got[1] == nil
+        check("miss: lead time reported only when the Giant Fiber really fired", ok,
+              "callbacks \(got.map { $0.map { String(format: "%.1f", $0) } ?? "nil" })")
+    }
+
     // --- hearing primes the Giant Fiber without ever firing it by itself ---
     if let data = loadBrainData() {
         func gfFires(alert: Float, loom: Float) -> Bool {
@@ -150,6 +168,36 @@ func runPopulationTest() {
         check("hearing: a loud room alone never fires GF (4 s)", !restFires, "fired \(restFires)")
         check("hearing: primed GF needs a smaller loom", tLoud < tQuiet,
               String(format: "loom threshold quiet %.2f -> loud %.2f", tQuiet, tLoud))
+        // population statistic: escapes at a marginal loom over 40 seeds, quiet vs loud,
+        // and GF activity from sound alone (20 s x 5 seeds, counted in 100 ms windows)
+        func escapes(alert: Float, loom: Float) -> Int {
+            var n = 0
+            for seed in 0..<40 {
+                TestRandom.reset("hearing stat \(seed)")
+                let sim = LIFSim(circuit: data.circuit, spikeBus: nil)
+                sim.step(400); _ = sim.consumeGF()
+                sim.alert = alert; sim.step(600); _ = sim.consumeGF()
+                sim.loomL = loom; sim.loomR = loom; sim.step(400)
+                if sim.consumeGF() { n += 1 }
+            }
+            return n
+        }
+        var marginal: Float = 0.05, bestGap = 99
+        for l in stride(from: Float(0.02), through: 0.20, by: 0.02) {
+            let gap = abs(escapes(alert: 0, loom: l) - 20)
+            if gap < bestGap { bestGap = gap; marginal = l }
+        }
+        let eq = escapes(alert: 0, loom: marginal), el = escapes(alert: 1, loom: marginal)
+        var spurious = 0
+        for seed in 0..<5 {
+            TestRandom.reset("hearing alone \(seed)")
+            let sim = LIFSim(circuit: data.circuit, spikeBus: nil)
+            sim.step(400); _ = sim.consumeGF(); sim.alert = 1
+            for _ in 0..<200 { sim.step(100); if sim.consumeGF() { spurious += 1 } }
+        }
+        check("hearing: more escapes at a marginal loom when the room is loud; sound alone stays near silent",
+              el > eq + 4 && spurious <= 10,   // measured: 24 -> 34 of 40; ~6 windows per 100 s of max noise
+              String(format: "loom %.2f: %d/40 quiet -> %d/40 loud; sound alone: %d GF windows in 100 s", marginal, eq, el, spurious))
     }
 
     UserDefaults.standard.removeObject(forKey: "popPressure")

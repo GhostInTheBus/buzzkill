@@ -39,8 +39,15 @@ A 🪰 appears in the menu bar. Everything below lives there.
 - **Squish** — click a grounded fly. Approach slowly: a fast cursor trips the
   real looming → escape reflex before your click lands. Hitbox: Normal 26 px,
   Forgiving 34, Tiny 18 (`x`).
-- **Misses are audible.** Swing and miss near a fly and you'll hear a short zip:
-  it saw you.
+- **Misses are audible — and shown.** Swing and miss near a fly and you'll hear
+  a short zip. If the getaway was the real thing — the brain fly's Giant Fiber
+  fired before your click — the brain window flashes both Giant Fibers with
+  "⚡ Giant Fiber fired N ms before your click" and the menu bar reads 🪰⚡ for a
+  moment. It only says so when it's true; a brainless fly or a bad aim gets
+  just the zip.
+- **Watch the brain** (`b`) — 23,210 real soma positions, with the 668
+  simulated neurons spiking live. Click a region to stimulate it, drag to
+  orbit, scroll to zoom, `f` for fullscreen, `e` for an escape test.
 - **Crumbs** (`m`) — carry one on the cursor, click to drop. Every fly comes.
 - **Attract to Cursor** (`t`) — park the cursor; the fly flies over and grooms.
 - **It stops when you do.** Idle a minute: 30 fps. Idle ten minutes (`i`:
@@ -57,11 +64,18 @@ A 🪰 appears in the menu bar. Everything below lives there.
   something approaching), the half of the frame it's in picks the eye, a fast
   sweep is wind. Lunge at the screen and the Giant Fiber fires. On-device,
   frames compared and dropped. The one feature that needs a permission.
-- **Hearing** — loud moments prime the escape circuit: a typing burst (always
-  on, permission-free) or, with **Hearing (mic)** on (`g`), the room's loudness
-  over its own ambient level. Primed, the Giant Fiber sits closer to threshold
-  and a slower approach tips it. Stalk quietly. The mic path reads one
-  loudness number per buffer; no audio is kept.
+- **Hearing** — the 16 sensory partners in the circuit are the fly's ears:
+  Johnston's organ auditory neurons (JO-A5, JO-B1), 13 of which synapse
+  directly onto the Giant Fiber. Loud moments drive them — a typing burst
+  (always on, permission-free) or, with **Hearing (mic)** on (`g`), the room's
+  loudness over its own ambient level — so sound reaches the escape circuit
+  through real wiring. Measured (`--populationtest`, 40 seeds): an approach
+  that triggers escape 24 times out of 40 in silence triggers it 34 out of 40
+  in a loud room, while sustained maximum noise alone sets it off about once
+  every 15–20 s. Stalk quietly. The mic path reads one
+  loudness number per buffer from the Mac's built-in mic (Bluetooth inputs are
+  refused so AirPods don't drop to call quality); no audio is kept, and the
+  app's own splat and zip are ignored.
 - **Stats** at the top of the menu: squished, got away, peak swarm, longest
   absence.
 

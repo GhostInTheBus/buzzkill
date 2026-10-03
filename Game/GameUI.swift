@@ -89,7 +89,22 @@ final class GameUI: NSObject {
         if d.bool(forKey: GameUI.cameraKey), CameraSense.authorization == .authorized { startCamera() }
         if d.bool(forKey: GameUI.hearingKey), Hearing.authorization == .authorized { startHearing() }
         setHitbox(d.integer(forKey: GameUI.hitboxKey))
+        coordinator.enqueue { [weak self] c in
+            c.game.onMiss = { lead in DispatchQueue.main.async { self?.showMiss(lead: lead) } }
+        }
         setAutoPause(minutes: d.object(forKey: GameUI.autoPauseKey) as? Int ?? 10)
+    }
+
+    /// The brain beat you: flash the Giant Fibers in the brain window and pulse the menu bar.
+    private var missPulse: DispatchWorkItem?
+    private func showMiss(lead: CGFloat?) {
+        guard let lead else { return }
+        app.brainWC?.showEscape(leadMs: Int((lead * 1000).rounded()))
+        app.statusItem.button?.title = "🪰⚡"
+        missPulse?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.app.statusItem.button?.title = "🪰" }
+        missPulse = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: work)
     }
 
     /// Called when the menu is about to open.
@@ -251,7 +266,7 @@ final class GameUI: NSObject {
     private func refreshHearingItem() {
         switch Hearing.authorization {
         case .denied, .restricted: hearingItem?.title = "Hearing (mic): No Access (open Settings)"
-        default: hearingItem?.title = hearingOn ? "Hearing (mic): On" : "Hearing (mic): Off"
+        default: hearingItem?.title = hearingOn ? "Hearing (mic): On" : (hearing?.refusedBluetooth == true ? "Hearing (mic): no built-in mic (Bluetooth refused)" : "Hearing (mic): Off")
         }
     }
 

@@ -18,7 +18,7 @@ pest is the **game** and lives in `Game/`, `Senses/` and `Audio/`.
 Keep this list short and current; it is what makes `tools/merge-upstream.sh` painless.
 
 **`main.swift`**
-- `Coordinator`: `handScene`/`handExtent` + a `HandLoom` instance; `let game = Game()`; `userIdle`; seven one-line entry points (`setAttract`, `setSquish`, `setSound`, `trySquish`, `pickUpCrumb`, `placeHeldCrumb`, `catchUpArrivals`); `game.preSim(...)` at the top of `advanceSimulation` and `game.drive(...)` before the sim step; hand loom folded into `sim.loomL/loomR/airPuff`; the hover-loom term in `computeLoom` is gated by cursor speed when attraction is on; `extension Coordinator: GameWorld`.
+- `Coordinator`: `handScene`/`handExtent` + a `HandLoom` instance; `let game = Game()`; `userIdle`; seven one-line entry points (`setAttract`, `setSquish`, `setSound`, `trySquish`, `pickUpCrumb`, `placeHeldCrumb`, `catchUpArrivals`); `game.preSim(...)` at the top of `advanceSimulation` and `game.drive(...)` before the sim step; hand loom folded into `sim.loomL/loomR/airPuff`; the hover-loom term in `computeLoom` is gated by cursor speed when attraction is on; `extension Coordinator: GameWorld`; `escapeAge` (seconds since the last GF spike, reset where `s.escape` is read) exposed as `brainEscapeAge`.
 - `AppDelegate`: `lazy var gameUI`; `gameUI.restore()` after the menu is built; `gameUI.addItems(to:)` in the menu; `gameUI.idleTick` in the 30 Hz timer (idle also passed to `setAmbient`); `gameUI.consumeClick` before `trySquish` in the click monitor; a `screensDidWakeNotification` observer.
 - CLI: `--attracttest`.
 
@@ -28,9 +28,12 @@ Keep this list short and current; it is what makes `tools/merge-upstream.sh` pai
 - `leaveChance` / `forceLeave` / `leaving` / `gone`: an escape from a threat may continue off screen; `land()` marks the fly gone.
 - abdomen pivot moved to the waist (position compensated) + `abdWag` during grooming.
 
+**`BrainView.swift`**
+- `BrainWindowController.showEscape(leadMs:)`: flashes the Giant Fibers and labels a swat the brain beat.
+
 **`Sim.swift`**
 - `attractTurn/attractDrive/attractGroom` inputs with `attractFwdGain`/`attractTurnGain`, injected per step into DNa01/02, DNp09, DNg11. Natural DNp09 is ~2 Hz; above ~20 Hz the leg circuit jams — measured, see `--attracttest`.
-- `alert` input (`alertGfGain`): sub-threshold current into GF and the wind-sensory partners while the room is loud. `--populationtest` asserts a loud room alone never fires GF in 4 s and that the loom threshold drops when primed.
+- `alert` input (`alertGain`): drives the 16 sensory partners only — auditory JO-A5/JO-B1 neurons per the FlyWire annotations, 13 of them presynaptic to GF — so sound primes escape through real wiring (no direct GF current). `--populationtest` measures it: sound alone near silent, more escapes at a marginal loom.
 
 **`build.sh`**: the three new directories, `-framework AVFoundation`, and upstream PR #18's flags `-wmo -enforce-exclusivity=unchecked` (locomotortest 8.7 s → 2.5 s here; live CPU 41% → 28% with one fly).
 

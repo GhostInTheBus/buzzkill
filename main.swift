@@ -717,6 +717,7 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
     // the pest game layer: crumbs, squish, population, attraction, sound
     let game = Game()
     private var userIdle: CGFloat = 0        // seconds since the user last touched anything
+    private var escapeAge: CGFloat = 99      // seconds since the Giant Fiber last fired
     private(set) var lastFlyPos = CGPoint.zero
 
     init(bounds: CGSize, sim: LIFSim?) {
@@ -900,6 +901,7 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
     }
 
     private func advanceSimulation(dt: CGFloat, mouse: CGPoint?, hand: CGPoint?, handExtent: CGFloat) {
+        escapeAge += dt
         game.preSim(world: self, dt: dt, mouse: mouse, idle: userIdle,
                     mouseSpeed: hypot(mouseVel.x, mouseVel.y), handSpeed: handLoom.speed)
         var signals: BrainSignals? = nil
@@ -930,6 +932,7 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
             sim.step(steps)
 
             var s = signalBuilder.make(sim, dt: dt)
+            if s.escape { escapeAge = 0 }
             s.tempo = tempo
             s.sleep = sleepy
             signals = s
@@ -947,6 +950,7 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
 
 extension Coordinator: GameWorld {
     func startle(_ strength: CGFloat) { loomOverride = max(loomOverride, strength) }
+    var brainEscapeAge: CGFloat { escapeAge }
 }
 
 // MARK: - App

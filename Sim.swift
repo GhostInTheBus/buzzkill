@@ -186,12 +186,13 @@ final class LIFSim {
     var attractTurn: Float = 0   // -1..1, >0 = target on the fly's left
     var attractDrive: Float = 0  // 0..1 forward urge
     var attractGroom: Float = 0  // 0..1, "arrived, feed/clean"
-    // hearing: loud moments (typing bursts, the mic) prime the escape circuit
-    // with a sub-threshold current into GF and the wind-sensory partners. GF
-    // steady state from alertGfGain alone is ~0.12 of threshold: never a spike
-    // by itself, but a smaller loom now tips it.
+    // hearing: loud moments (typing bursts, the mic) drive the 16 sensory
+    // partners — which the FlyWire annotations class as auditory (Johnston's
+    // organ JO-A5/JO-B1, antennal nerve); 13 of them synapse directly onto GF.
+    // So sound reaches the escape circuit through real wiring, with no
+    // synthetic current into GF itself.
     var alert: Float = 0
-    var alertGfGain: Float = 0.006
+    var alertGain: Float = 0.026
     var attractFwdGain: Float = 0.008   // ~7 Hz DNp09: a nudge, not a shout (>~20 Hz jams the legs)
     var attractTurnGain: Float = 0.02   // visible DNa asymmetry; steering itself is body-level
     var activityScale: Float = 1  // circadian / sleep neuromodulation of baseline+noise
@@ -389,10 +390,7 @@ final class LIFSim {
                 if turn > 0 { for i in dnaL { v[i] += turn } } else if turn < 0 { for i in dnaR { v[i] -= turn } }
             }
             if attractGroom > 0.001 { for i in groom { v[i] += attractGroom * 0.16 * sensoryGate } }
-            if alert > 0.001 {
-                for i in gf { v[i] += alert * alertGfGain }
-                for i in sens { v[i] += alert * 0.02 * sensoryGate }
-            }
+            if alert > 0.001 { for i in sens { v[i] += alert * alertGain * sensoryGate } }
             // brain-window click stimulation
             for s in activeStims where simMs < s.untilMs {
                 for i in s.idx { v[i] += s.strength }

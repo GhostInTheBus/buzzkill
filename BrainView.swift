@@ -453,6 +453,13 @@ final class BrainWindowController {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.2, execute: work)
     }
 
+    /// A swat just missed because the Giant Fiber fired first: show it.
+    func showEscape(leadMs: Int) {
+        for i in sim.gf { driver.flash(neuron: i, isGF: true) }
+        if let i = sim.gf.first { flashRing(at: sim.positions[i]) }
+        showLabel("⚡ Giant Fiber fired \(leadMs) ms before your click")
+    }
+
     var isVisible: Bool { panel.isVisible }
     func show() { panel.orderFront(nil) }
     func hide() { panel.orderOut(nil) }

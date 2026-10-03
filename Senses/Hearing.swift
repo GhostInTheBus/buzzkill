@@ -6,6 +6,39 @@
 // adaptive to room noise; no audio is kept.
 
 import AVFoundation
+import CoreAudio
+
+private func audioTransport(of id: AudioDeviceID) -> UInt32 {
+    var a = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyTransportType,
+                                       mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+    var t: UInt32 = 0; var s = UInt32(MemoryLayout<UInt32>.size)
+    AudioObjectGetPropertyData(id, &a, 0, nil, &s, &t)
+    return t
+}
+private func hasInput(_ id: AudioDeviceID) -> Bool {
+    var a = AudioObjectPropertyAddress(mSelector: kAudioDevicePropertyStreams,
+                                       mScope: kAudioDevicePropertyScopeInput, mElement: kAudioObjectPropertyElementMain)
+    var s: UInt32 = 0
+    return AudioObjectGetPropertyDataSize(id, &a, 0, nil, &s) == noErr && s > 0
+}
+/// The Mac's own microphone, if it has one.
+private func builtInInputDevice() -> AudioDeviceID? {
+    var a = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDevices,
+                                       mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+    var size: UInt32 = 0
+    let sys = AudioObjectID(kAudioObjectSystemObject)
+    guard AudioObjectGetPropertyDataSize(sys, &a, 0, nil, &size) == noErr, size > 0 else { return nil }
+    var ids = [AudioDeviceID](repeating: 0, count: Int(size) / MemoryLayout<AudioDeviceID>.size)
+    guard AudioObjectGetPropertyData(sys, &a, 0, nil, &size, &ids) == noErr else { return nil }
+    return ids.first { hasInput($0) && audioTransport(of: $0) == kAudioDeviceTransportTypeBuiltIn }
+}
+private func defaultInputDevice() -> AudioDeviceID? {
+    var a = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultInputDevice,
+                                       mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+    var id = AudioDeviceID(0); var s = UInt32(MemoryLayout<AudioDeviceID>.size)
+    guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &a, 0, nil, &s, &id) == noErr, id != 0 else { return nil }
+    return id
+}
 
 final class Hearing {
     /// 0..1 how loud the room is above its own ambient floor. Read from the render loop.
@@ -14,6 +47,9 @@ final class Hearing {
     private var engine: AVAudioEngine?
     private var floorDb: Float = -60       // slow estimate of the quiet level
     private(set) var running = false
+    /// True when start was refused because the only input is Bluetooth (opening
+    /// it would drop AirPods to call quality).
+    private(set) var refusedBluetooth = false
 
     static var authorization: AVAuthorizationStatus { AVCaptureDevice.authorizationStatus(for: .audio) }
     static func requestAccess(_ done: @escaping (Bool) -> Void) {
@@ -34,6 +70,16 @@ final class Hearing {
     private func startNow() -> Bool {
         let eng = AVAudioEngine()
         let input = eng.inputNode
+        // Use the Mac's own mic regardless of the system default. If there isn't
+        // one and the default input is Bluetooth, refuse rather than degrade it.
+        refusedBluetooth = false
+        if let dev = builtInInputDevice() {
+            try? input.auAudioUnit.setDeviceID(dev)
+        } else if let d = defaultInputDevice(),
+                  [kAudioDeviceTransportTypeBluetooth, kAudioDeviceTransportTypeBluetoothLE].contains(audioTransport(of: d)) {
+            refusedBluetooth = true
+            return false
+        }
         let fmt = input.outputFormat(forBus: 0)
         guard fmt.channelCount > 0 else { return false }
         input.installTap(onBus: 0, bufferSize: 2048, format: fmt) { [weak self] buf, _ in

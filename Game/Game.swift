@@ -12,11 +12,16 @@ final class Game {
     var attractOn = false
     var sound: FlySound?   // nil = muted (set from the main thread)
     var hearing: Hearing?  // nil = mic off (set from the main thread)
+    /// Render thread. Called on a swing that missed near a fly: the lead time (s)
+    /// by which the brain fly's Giant Fiber beat the click, or nil when the
+    /// getaway wasn't a real GF escape (a brainless fly, or just a bad aim).
+    var onMiss: ((CGFloat?) -> Void)?
+    private var selfSoundMute: CGFloat = 0   // the mic shouldn't hear our own splat/zip
 
     /// Sound in the room, 0..1: a typing burst or the mic over ambient.
     func alert(typing: CGFloat) -> Float {
         let keys = Float(clampf((typing - 0.5) * 2, 0, 1))
-        return max(keys, hearing?.read() ?? 0)
+        return max(keys, selfSoundMute > 0 ? 0 : (hearing?.read() ?? 0))
     }
 
     private let attractDebug = ProcessInfo.processInfo.environment["DESKTOPFLY_ATTRACT_DEBUG"] != nil
@@ -30,16 +35,26 @@ final class Game {
     func squish(at p: CGPoint, world: GameWorld) {
         guard splats.squish(at: p, world: world) != nil else {
             // a swing that missed near a fly: it saw you coming. Make that audible.
-            if splats.enabled, splats.nearMiss(at: p, world: world) { stats.noteMiss(); sound?.miss() }
+            if splats.enabled, splats.nearMiss(at: p, world: world) {
+                stats.noteMiss(); sound?.miss(); selfSoundMute = 0.4
+                // only claim "the brain beat you" when it's true
+                var lead: CGFloat? = nil
+                if let brain = world.flies.first, brain.state == .flying,
+                   hypot(p.x - brain.pos.x, p.y - brain.pos.y) < 260, world.brainEscapeAge < 1.5 {
+                    lead = world.brainEscapeAge
+                }
+                onMiss?(lead)
+            }
             return
         }
-        sound?.splat()
+        sound?.splat(); selfSoundMute = 0.4
         stats.noteKill()
         population.noteSquish(world: world)
     }
 
     /// Before the brain steps: world housekeeping that doesn't need the sim.
     func preSim(world: GameWorld, dt: CGFloat, mouse: CGPoint?, idle: CGFloat, mouseSpeed: CGFloat, handSpeed: CGFloat) {
+        selfSoundMute = max(0, selfSoundMute - dt)
         splats.update(dt: dt, world: world)
         crumbs.update(world: world, dt: dt, mouse: mouse)
         buzz(world: world)
