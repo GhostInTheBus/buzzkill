@@ -685,6 +685,10 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
     var flies: [Fly] = []
     var lastTime: TimeInterval?
     var mouseScene: CGPoint?
+    // camera sense: hand position in scene coords + how much of the camera
+    // frame it fills (written from the capture queue, read in render loop)
+    var handScene: CGPoint?
+    var handExtent: CGFloat = 0
     private let lock = NSLock()
     private var pending: [(Coordinator) -> Void] = []
 
@@ -700,6 +704,12 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
     private var mouseVelRaw = CGPoint.zero   // last measurement, held between samples
     private var mouseSampleDt: CGFloat = 0   // real time since that measurement
     private var loomOverride: CGFloat = 0
+    private var prevHand: CGPoint?
+    private var handVel = CGPoint.zero
+    private var handVelRaw = CGPoint.zero
+    private var handSampleDt: CGFloat = 0
+    private var prevHandExtent: CGFloat = 0
+    private var handGrowth: CGFloat = 0      // d(extent)/dt, smoothed; >0 = lunging at the screen
 
     // environment senses (written from main-thread timers, read in render loop)
     private var terrain: [Ledge] = []
@@ -709,6 +719,7 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
     private var activity: Float = 1
     private var windowLoomL: Float = 0
     private var windowLoomR: Float = 0
+    private var attractOn = false
     private(set) var lastFlyPos = CGPoint.zero
 
     init(bounds: CGSize, sim: LIFSim?) {
@@ -754,6 +765,10 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
         }
     }
     func setMouse(_ p: CGPoint?) { lock.lock(); mouseScene = p; lock.unlock() }
+    func setAttract(_ on: Bool) { enqueue { $0.attractOn = on } }
+    func setHand(_ p: CGPoint?, extent: CGFloat) {
+        lock.lock(); handScene = p; handExtent = extent; lock.unlock()
+    }
 
     func setTerrain(_ ledges: [Ledge]) { enqueue { $0.terrain = ledges } }
 
@@ -851,6 +866,45 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
         return (Float(loom * lw), Float(loom * rw), Float(puff))
     }
 
+    // A hand seen by the camera is a second looming object. Same geometry as
+    // the cursor (planar approach + proximity), plus the hand growing in the
+    // frame, which is what a swat at the screen looks like from the webcam.
+    private func computeHandLoom(fly: Fly, hand: CGPoint?, extent: CGFloat, dt: CGFloat) -> (l: Float, r: Float, puff: Float) {
+        guard let h = hand, dt > 0 else {
+            prevHand = nil; handVel = .zero; handVelRaw = .zero; handGrowth = 0; prevHandExtent = 0
+            return (0, 0, 0)
+        }
+        if let ph = prevHand {
+            // sampled at ~15 Hz by the camera, consumed per rendered frame
+            handSampleDt += dt
+            if h != ph || handSampleDt >= 1.0 / 15 {
+                handVelRaw = CGPoint(x: (h.x - ph.x) / handSampleDt, y: (h.y - ph.y) / handSampleDt)
+                let growthRaw = max(0, (extent - prevHandExtent) / handSampleDt)
+                handGrowth += (growthRaw - handGrowth) * 0.5
+                prevHand = h; prevHandExtent = extent
+                handSampleDt = 0
+            }
+            let k = lag(24, dt)
+            handVel.x += (handVelRaw.x - handVel.x) * k
+            handVel.y += (handVelRaw.y - handVel.y) * k
+        } else {
+            prevHand = h; prevHandExtent = extent; handSampleDt = 0
+        }
+        let rel = CGPoint(x: h.x - fly.pos.x, y: h.y - fly.pos.y)
+        let dist = max(20, hypot(rel.x, rel.y))
+        let approach = -(rel.x * handVel.x + rel.y * handVel.y) / dist
+        var loom = clampf(approach / dist * 6, 0, 1) * clampf(1 - dist / 900, 0, 1)
+        loom += clampf(handGrowth / 1.5, 0, 1) * clampf(1 - dist / 700, 0, 1)
+        loom = clampf(loom, 0, 1)
+        let f = CGPoint(x: cos(fly.heading), y: sin(fly.heading))
+        let rd = CGPoint(x: rel.x / dist, y: rel.y / dist)
+        let crossZ = f.x * rd.y - f.y * rd.x
+        let lw = clampf(0.5 + 0.5 * crossZ, 0.12, 1)
+        let rw = clampf(0.5 - 0.5 * crossZ, 0.12, 1)
+        let puff = clampf(hypot(handVel.x, handVel.y) / 1500, 0, 1) * clampf(1 - dist / 600, 0, 1)
+        return (Float(loom * lw), Float(loom * rw), Float(puff))
+    }
+
     func renderer(_ renderer: SCNSceneRenderer, updateAtTime t: TimeInterval) {
         if fpsLog {
             if fpsWindowStart == 0 { fpsWindowStart = t }
@@ -864,6 +918,7 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
         lock.lock()
         let actions = pending; pending.removeAll()
         let mouse = mouseScene
+        let hand = handScene, handExt = handExtent
         lock.unlock()
         for a in actions { a(self) }
 
@@ -871,19 +926,34 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
         let dt = CGFloat(min(0.05, max(0, t - last)))
         lastTime = t
 
-        simulationClock.advance(dt) { self.advanceSimulation(dt: $0, mouse: mouse) }
+        simulationClock.advance(dt) { self.advanceSimulation(dt: $0, mouse: mouse, hand: hand, handExtent: handExt) }
     }
 
-    private func advanceSimulation(dt: CGFloat, mouse: CGPoint?) {
+    private func advanceSimulation(dt: CGFloat, mouse: CGPoint?, hand: CGPoint?, handExtent: CGFloat) {
         var signals: BrainSignals? = nil
         if let sim = sim, let first = flies.first {
             let sensory = computeLoom(fly: first, mouse: mouse, dt: dt)
+            let handS = computeHandLoom(fly: first, hand: hand, extent: handExtent, dt: dt)
             let decayF = Float(exp(-4 * Double(dt)))
             windowLoomL *= decayF
             windowLoomR *= decayF
-            sim.loomL = max(sensory.l, windowLoomL)
-            sim.loomR = max(sensory.r, windowLoomR)
-            sim.airPuff = max(sensory.puff, Float(typingLevel * 0.30))
+            sim.loomL = max(sensory.l, handS.l, windowLoomL)
+            sim.loomR = max(sensory.r, handS.r, windowLoomR)
+            sim.airPuff = max(sensory.puff, handS.puff, Float(typingLevel * 0.30))
+            // the cursor as a sugar drop: steer + walk toward it via the real DNs,
+            // groom when there. A lunging cursor still looms, so it also still scares.
+            if attractOn, let m = mouse, first.state != .flying {
+                let rel = CGPoint(x: m.x - first.pos.x, y: m.y - first.pos.y)
+                let dist = max(1, hypot(rel.x, rel.y))
+                let f = CGPoint(x: cos(first.heading), y: sin(first.heading))
+                let crossZ = (f.x * rel.y - f.y * rel.x) / dist      // >0: target on the left
+                let arrived = dist < 55
+                sim.attractTurn = Float(clampf(crossZ * 1.5, -1, 1))
+                sim.attractDrive = arrived ? 0 : Float(clampf(dist / 350, 0.4, 1))
+                sim.attractGroom = arrived ? 0.7 : 0
+            } else {
+                sim.attractTurn = 0; sim.attractDrive = 0; sim.attractGroom = 0
+            }
             // body -> brain: leg proprioception from the current gait
             sim.gaitDrive = Float(first.walkingIntensity)
             sim.gaitPhase = Float(first.gaitPhasePublic)
@@ -930,6 +1000,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var mouseTimer: Timer?
     var windowTimer: Timer?
     var clickMonitor: Any?
+    // camera swat: opt-in, persisted; the only sense that needs a permission
+    var cameraSense: CameraSense?
+    var cameraItem: NSMenuItem?
+    var cameraOn = false
+    static let cameraKey = "cameraSwat"
+    var attractItem: NSMenuItem?
+    var attractOn = false
+    static let attractKey = "attractCursor"
     let windowSense = WindowSense()
     var typingLevel: CGFloat = 0
     var paused = false
@@ -990,6 +1068,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         setupStatusItem()
+        if UserDefaults.standard.bool(forKey: AppDelegate.attractKey) { setAttract(true) }
+        if UserDefaults.standard.bool(forKey: AppDelegate.cameraKey), CameraSense.authorization == .authorized {
+            startCamera()
+        }
 
         mouseTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
             guard let self else { return }
@@ -1087,6 +1169,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(item("Add Fly", #selector(addFly), "a"))
         menu.addItem(item("Remove Fly", #selector(removeFly), "r"))
         menu.addItem(item("Scare Flies", #selector(scareAll), "s"))
+        let att = item("Attract to Cursor: Off", #selector(toggleAttract), "t")
+        attractItem = att
+        menu.addItem(att)
+        let cam = item("Camera Swat: Off", #selector(toggleCamera), "c")
+        cameraItem = cam
+        menu.addItem(cam)
+        refreshCameraItem()
         let body = item("Body: Fruit Fly", #selector(toggleBody), "y")
         bodyItem = body
         menu.addItem(body)
@@ -1124,6 +1213,56 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func addFly() { coordinator.addFly() }
     @objc func removeFly() { coordinator.removeFly() }
     @objc func scareAll() { coordinator.scareAll() }
+    @objc func toggleAttract() { setAttract(!attractOn) }
+    func setAttract(_ on: Bool) {
+        attractOn = on
+        coordinator.setAttract(on)
+        UserDefaults.standard.set(on, forKey: AppDelegate.attractKey)
+        attractItem?.title = on ? "Attract to Cursor: On" : "Attract to Cursor: Off"
+    }
+    @objc func toggleCamera() {
+        if cameraOn {
+            stopCamera()
+            UserDefaults.standard.set(false, forKey: AppDelegate.cameraKey)
+            return
+        }
+        switch CameraSense.authorization {
+        case .authorized: startCamera()
+        case .notDetermined:
+            CameraSense.requestAccess { [weak self] ok in
+                if ok { self?.startCamera() } else { self?.refreshCameraItem() }
+            }
+        default:
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera") {
+                NSWorkspace.shared.open(url)
+            }
+        }
+    }
+    func startCamera() {
+        let cs = cameraSense ?? CameraSense()
+        cameraSense = cs
+        cs.onHand = { [weak self] p, extent in
+            guard let self else { return }
+            // camera frame -> this display's scene plane (centered, points)
+            let sf = self.screenFrame
+            let scene = p.map { CGPoint(x: ($0.x - 0.5) * sf.width, y: ($0.y - 0.5) * sf.height) }
+            self.coordinator.setHand(scene, extent: extent)
+        }
+        cameraOn = cs.start()
+        UserDefaults.standard.set(cameraOn, forKey: AppDelegate.cameraKey)
+        refreshCameraItem()
+    }
+    func stopCamera() {
+        cameraSense?.stop()
+        cameraOn = false
+        refreshCameraItem()
+    }
+    func refreshCameraItem() {
+        switch CameraSense.authorization {
+        case .denied, .restricted: cameraItem?.title = "Camera Swat: No Access (open Settings)"
+        default: cameraItem?.title = cameraOn ? "Camera Swat: On" : "Camera Swat: Off"
+        }
+    }
     @objc func toggleBody() {
         // BODY_FORM itself is only ever mutated on the render thread (see the
         // threading model); the menu tracks what it asked for, for the label.

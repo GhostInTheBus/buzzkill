@@ -120,6 +120,25 @@ connectome extraction, neural model, body, everything you actually see — is
 the work of [Denis Shiryaev](https://github.com/DenisSergeevitch) in the
 [upstream repo](https://github.com/DenisSergeevitch/desktop-fly).
 
+### Fork additions (`senses` branch)
+
+Two opt-in senses, both off by default, both in the 🪰 menu:
+
+- **Attract to Cursor** (`t`) — the cursor acts like a sugar drop. The real
+  steering (DNa01/DNa02) and forward-walking (DNp09) neurons get a synthetic
+  drive toward it, and the grooming DN (DNg11) fires on arrival. There is no
+  gustatory circuit in this extract, so this is an added input in the same
+  spirit as loom — not a pathway from the data. The loom pathway stays live,
+  so a lunging cursor still scares the fly off.
+- **Camera Swat** (`c`) — the webcam watches for a hand (Vision hand-pose,
+  on-device, frames discarded) and feeds it into the same loom / air-puff
+  pathway as the cursor, so a swat at the screen triggers the real giant-fiber
+  escape. This is the one sense that needs a permission (Camera), which is
+  why it is not upstream and off by default.
+
+The fly itself is unchanged and is the work of
+[Denis Shiryaev](https://github.com/DenisSergeevitch).
+
 ### Windows
 
 An Electron + three.js port with the same connectome extracts, neural models, and

@@ -180,6 +180,12 @@ final class LIFSim {
     var gaitDrive: Float = 0   // body walking intensity -> ascending neurons
     var gaitPhase: Float = 0   // body gait phase 0..1 -> rhythmic proprioception
     var airPuff: Float = 0     // fast cursor motion near the fly -> sensory neurons
+    // "attractant" at the cursor (opt-in): drives the real steering and
+    // forward-walking DNs toward it, and grooming on arrival. Not a circuit
+    // in the data (no gustatory pathway here) — a synthetic input, like loom.
+    var attractTurn: Float = 0   // -1..1, >0 = target on the fly's left
+    var attractDrive: Float = 0  // 0..1 forward urge
+    var attractGroom: Float = 0  // 0..1, "arrived, feed/clean"
     var activityScale: Float = 1  // circadian / sleep neuromodulation of baseline+noise
     var sensoryGate: Float = 1    // sleep gates sensory input (raised arousal threshold)
 
@@ -368,6 +374,13 @@ final class LIFSim {
             }
             // fast air movement near the fly -> sensory pathway
             if airPuff > 0.001 { for i in sens { v[i] += airPuff * 0.12 * sensoryGate } }
+            // cursor attractant -> DNp09 (walk) + DNa01/02 (steer) + DNg11 (groom)
+            if attractDrive > 0.001 {
+                for i in fwd { v[i] += attractDrive * 0.10 * sensoryGate }
+                let turn = attractTurn * attractDrive * 0.22 * sensoryGate
+                if turn > 0 { for i in dnaL { v[i] += turn } } else if turn < 0 { for i in dnaR { v[i] -= turn } }
+            }
+            if attractGroom > 0.001 { for i in groom { v[i] += attractGroom * 0.16 * sensoryGate } }
             // brain-window click stimulation
             for s in activeStims where simMs < s.untilMs {
                 for i in s.idx { v[i] += s.strength }
