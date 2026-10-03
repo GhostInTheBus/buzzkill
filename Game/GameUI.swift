@@ -37,6 +37,8 @@ final class GameUI: NSObject {
         }
         statsItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
         menu.addItem(statsItem!)
+        let credit = item("Built on desktop-fly by Denis Shiryaev", #selector(openUpstream), "")
+        menu.addItem(credit)
         menu.addItem(.separator())
         attractItem = item("Attract to Cursor: Off", #selector(toggleAttract), "t")
         menu.addItem(attractItem!)
@@ -124,6 +126,9 @@ final class GameUI: NSObject {
 
     // MARK: toggles
 
+    @objc func openUpstream() {
+        if let url = URL(string: "https://github.com/DenisSergeevitch/desktop-fly") { NSWorkspace.shared.open(url) }
+    }
     @objc func toggleAttract() { setAttract(!attractOn) }
     @objc func toggleSquish() { setSquish(!squishOn) }
     @objc func toggleSound() { setSound(!soundOn) }

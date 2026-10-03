@@ -1,0 +1,12 @@
+This fork is a game built on desktop-fly by Denis Shiryaev
+(https://github.com/DenisSergeevitch/desktop-fly), MIT License — see LICENSE.
+The fly, its 668-neuron FlyWire brain circuit, the 1,045-neuron MaleCNS leg
+circuit, the body and the brain window are his work and are unchanged here
+apart from the hooks listed in ENGINE.md.
+
+Connectome data: FlyWire v783 (CC BY-NC 4.0) and MaleCNS v1.0 (CC BY 4.0).
+Citations and terms in data/DATA_LICENSE.md and data/LOCOMOTOR_PROVENANCE.md.
+Because of the FlyWire license this software may not be sold.
+
+The game layer (Game/, Senses/, Audio/, packaging) is released under the same
+MIT License.
