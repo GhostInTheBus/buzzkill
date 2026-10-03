@@ -6,7 +6,9 @@ apart from the hooks listed in ENGINE.md.
 
 Connectome data: FlyWire v783 (CC BY-NC 4.0) and MaleCNS v1.0 (CC BY 4.0).
 Citations and terms in data/DATA_LICENSE.md and data/LOCOMOTOR_PROVENANCE.md.
-Because of the FlyWire license this software may not be sold.
+The default data (data/) is FlyWire-derived and non-commercial. data-malecns/
+is MaleCNS-derived (CC BY 4.0); a build made with `package.sh --malecns`
+contains only that and carries no non-commercial restriction.
 
 The game layer (Game/, Senses/, Audio/, packaging) is released under the same
 MIT License.

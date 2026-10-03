@@ -31,6 +31,7 @@ final class GameUI: NSObject {
     // computed from idle time and streams in on resume, so pausing early costs
     // nothing. Also: 30 fps once the user has been away a minute.
     private(set) var autoPaused = false
+    private static let noAutoPause = ProcessInfo.processInfo.environment["BUZZKILL_NO_AUTOPAUSE"] != nil
     static let autoPauseKey = "autoPauseMinutes"
     private static let pauseChoices = [5, 10, 30, 60]
     private var autoPauseMinutes = 10
@@ -136,6 +137,7 @@ final class GameUI: NSObject {
     /// Called from the 30 Hz mouse timer. Returns true when the scene is auto-paused
     /// (callers should feed it nothing, so actions don't pile up).
     func idleTick(idleNow: Double) -> Bool {
+        if GameUI.noAutoPause { return false }   // BUZZKILL_NO_AUTOPAUSE=1: for unattended test runs
         if !app.paused {
             if !autoPaused && idleNow > Double(autoPauseMinutes * 60) { setAutoPaused(true, idle: idleNow) }
             else if autoPaused && idleNow < 3 { setAutoPaused(false, idle: idleNow) }

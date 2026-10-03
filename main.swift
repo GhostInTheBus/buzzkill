@@ -993,7 +993,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if let data = loadBrainData() {
             sim = LIFSim(circuit: data.circuit, spikeBus: spikeBus, locomotorCircuit: data.locomotor)
             brainPoints = data.points
-            dataInfo = "FlyWire v783 · \(data.points.points.count) somas · circuit \(data.circuit.neurons.count)n/\(data.circuit.edges.count)e"
+            let brainSource = (data.circuit.source ?? "").contains("MaleCNS") ? "MaleCNS v1.0 brain" : "FlyWire v783"
+            dataInfo = "\(brainSource) · \(data.points.points.count) somas · circuit \(data.circuit.neurons.count)n/\(data.circuit.edges.count)e"
                 + " · MaleCNS \(data.locomotor.neurons.count)n/\(data.locomotor.edges.count)e"
         }
 
@@ -1207,6 +1208,7 @@ if args.contains("--simtest") {
 }
 if args.contains("--attracttest") { runAttractTest(); exit(0) }
 if args.contains("--populationtest") { runPopulationTest() }
+if args.contains("--gfstat") { runGFStat(); exit(0) }
 if args.contains("--behaviortest") {
     runBehaviorTest()
 }

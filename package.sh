@@ -3,6 +3,8 @@
 #   ./package.sh              -> ./dist/Buzzkill.app (native arch)
 #   ./package.sh --install    -> also copies to /Applications and launches it
 #   ./package.sh --universal  -> arm64 + x86_64 binary (for releases)
+#   ./package.sh --malecns    -> bundle only the MaleCNS (CC BY 4.0) data: no
+#                                FlyWire-derived, non-commercial files in the app
 # Needs Xcode Command Line Tools (swiftc, sips, iconutil, lipo). No sudo.
 set -e
 cd "$(dirname "$0")"
@@ -26,7 +28,12 @@ rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 # The binary looks for data/ next to itself (Sim.swift findDataDir), so it
 # lives in MacOS/, not Resources/.
 cp Buzzkill "$APP/Contents/MacOS/Buzzkill"
-cp -R data "$APP/Contents/MacOS/data"
+if [[ " $* " == *" --malecns "* ]]; then
+  cp -R data-malecns "$APP/Contents/MacOS/data"
+  echo "data: MaleCNS v1.0 only (CC BY 4.0)"
+else
+  cp -R data "$APP/Contents/MacOS/data"
+fi
 cp packaging/Info.plist "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 

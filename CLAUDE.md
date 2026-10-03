@@ -24,7 +24,8 @@ models. Do not claim biologically calibrated walking from anatomical checks.
 | `etl_malecns.py` | public MaleCNS Feather tables → `data/locomotor_circuit.json` + `data/locomotor_report.json` |
 | `data/` | FlyWire CC BY-NC 4.0 and MaleCNS CC BY 4.0 data; see `DATA_LICENSE.md` and `LOCOMOTOR_PROVENANCE.md` |
 | `Game/`, `Senses/`, `Audio/` | **this fork's game layer** — pest behavior (arrivals, crumbs, squish, attraction, spook), webcam hand sense, synthesized sound, menu/toggles. See `ENGINE.md` for the boundary and the few engine touch points. |
-| `package.sh`, `packaging/` | .app bundle build (`./package.sh --install`) |
+| `package.sh`, `packaging/` | .app bundle build (`./package.sh --install`; `--malecns` bundles only CC BY data; `--universal`) |
+| `etl_malecns_brain.py`, `data-malecns/` | **this fork**: the brain circuit re-extracted from MaleCNS v1.0 (CC BY 4.0) with fitted per-dataset model parameters in `circuit.json` → `model`. Run `tools/test-all.sh` after any sim change: every suite must pass on BOTH extracts. |
 
 ## Build, run, verify
 

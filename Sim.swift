@@ -97,6 +97,13 @@ struct CircuitNeuronFile: Decodable {
 struct CircuitFile: Decodable {
     let neurons: [CircuitNeuronFile]
     let edges: [[Float]]      // [preIdx, postIdx, signedSynCount]
+    /// Optional per-dataset model parameters. Synapse counts are not comparable
+    /// between connectomes (different detectors, different animals), so the
+    /// model's free parameters are fit per extract and travel with the data.
+    /// Absent = the values the FlyWire extract was tuned with.
+    let model: [String: Float]?
+    /// Free-text provenance written by the extractor ("FlyWire Codex FAFB v783 …", "MaleCNS v1.0 …").
+    let source: String?
 }
 
 func findDataDir() -> URL? {
@@ -228,7 +235,7 @@ final class LIFSim {
     private let decay: Float = 0.9512     // exp(-1/20): 20 ms membrane tau, 1 ms step
     private let threshold: Float = 1.0
     private let refractoryMs: Float = 2
-    private let weightScale: Float = 0.0008
+    private var weightScale: Float = 0.0008
     private let pNoise: Float = 0.0022
     private let noiseKick: Float = 0.42
     private let loomGain: Float = 0.30
@@ -331,15 +338,20 @@ final class LIFSim {
         // LC4/LPLC2 -> GF and the wind pathway (JO sensory) -> GF couple via
         // electrical (gap-junction) synapses, which chemical synapse counts
         // under-represent; boost that drive.
-        let gapJunctionBoost: Float = 6.0
+        if let ws = circuit.model?["weightScale"] { weightScale = ws }
+        if let ag = circuit.model?["alertGain"] { alertGain = ag }
+        // The two pathways are separate parameters: the JO -> GF coupling is
+        // electrical in the animal whatever the dataset, while the LC -> GF boost
+        // compensates for how a given connectome counts those chemical synapses.
+        let gapJunctionBoost: Float = circuit.model?["gapJunctionBoost"] ?? 6.0
+        let sensoryGapBoost: Float = circuit.model?["sensoryGapBoost"] ?? gapJunctionBoost
         var fill = rowStart
         for e in circuit.edges {
             let pre = Int(e[0]), post = Int(e[1])
             var weight = e[2] * weightScale
-            let electrical = roles[pre] == "lc4" || roles[pre] == "lplc2"
-                || (roles[pre] == "other" && types[pre] == "sensory")
-            if electrical && roles[post] == "gf" {
-                weight *= gapJunctionBoost
+            if roles[post] == "gf" {
+                if roles[pre] == "lc4" || roles[pre] == "lplc2" { weight *= gapJunctionBoost }
+                else if roles[pre] == "other" && types[pre] == "sensory" { weight *= sensoryGapBoost }
             }
             colIdx[fill[pre]] = Int32(post)
             w[fill[pre]] = weight

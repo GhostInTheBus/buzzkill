@@ -97,11 +97,35 @@ whole game layer: crumbs, squishing, arrivals, scattering, stats. There is no
 feeding or olfactory circuit in the data; the attractant is a synthetic input
 in the same spirit as the author's loom.
 
+## Two brains, two licenses
+
+The app runs on either of two extracts of the same circuit:
+
+| | `data/` (default) | `data-malecns/` |
+|---|---|---|
+| source | FlyWire v783, a female brain | MaleCNS v1.0, a male brain and nerve cord |
+| circuit | 668 neurons, 18,968 edges | 665 neurons, 23,795 edges |
+| license | **CC BY-NC 4.0** — non-commercial | **CC BY 4.0** — no such limit |
+| fit | upstream's | re-fit here; see `data-malecns/PROVENANCE.md` |
+
+Same cell types, same selection rules, same test suites — all pass on both.
+On either one the Giant Fiber's strongest sensory inputs turn out to be the
+same thing: the auditory neurons of Johnston's organ. `./package.sh --malecns`
+builds an app containing only the CC BY data, with the legs and the brain from
+one animal. `BUZZKILL_DATA=data-malecns ./Buzzkill` switches at run time. The
+menu shows which brain is loaded.
+
+Known differences on male wiring, stated in the provenance file: a sharper
+escape threshold, and a Giant Fiber that keeps firing through a sustained loom
+instead of being shut down after a spike or two. Neither changes how it plays.
+
 ## Diagnostics
 
 ```sh
 ./Buzzkill --simtest --behaviortest --locomotortest   # the engine's suites
 ./Buzzkill --populationtest                           # the game's rules
+tools/test-all.sh                                     # every suite, both brains
+./Buzzkill --gfstat                                   # Giant Fiber profile for fitting an extract
 ./Buzzkill --attracttest                              # attraction, headless
 DESKTOPFLY_SWARM_TEST=200 DESKTOPFLY_FPS=1 ./Buzzkill  # stress (240 flies = 120 fps)
 ```
@@ -109,5 +133,6 @@ DESKTOPFLY_SWARM_TEST=200 DESKTOPFLY_FPS=1 ./Buzzkill  # stress (240 flies = 120
 ## License
 
 MIT (code), see [LICENSE](LICENSE) and [NOTICE](NOTICE). Connectome data:
-FlyWire CC BY-NC 4.0 and MaleCNS CC BY 4.0 — see `data/DATA_LICENSE.md`. The
-non-commercial data license means this software is free and can't be sold.
+`data/` is FlyWire-derived (CC BY-NC 4.0, non-commercial); `data-malecns/` is
+MaleCNS-derived (CC BY 4.0). A build made with `./package.sh --malecns` carries
+only the latter. See `data/DATA_LICENSE.md` and `data-malecns/DATA_LICENSE.md`.
