@@ -135,19 +135,31 @@ that the behavior comes from real wiring.
   (measured headless, see `--attracttest`), so the fly hops to the target and
   lands just short of it, the way a real fly reaches food. A parked cursor no
   longer counts as a looming threat while this is on; a lunging one still does.
-- **Drop Crumb at Cursor** (`m`) — food. Every fly converges on it and feeds;
-  a crumb lasts about 80 s per fly. Finishing crumbs makes new flies arrive sooner.
-- **Squish on Click** (`k`, on) — click a grounded fly and it becomes a splat
-  with the flattened fly in it, solid for 2.5 minutes, fading over the next.
-  You have to earn it: a fast cursor trips the real escape circuit first.
-- **Arrivals while you're away** — newcomers fly in from a screen edge. At the
-  desk: every 1.5–4 minutes, up to 4 flies. Idle for a minute or more: every
-  25–70 s, up to 12 — how many you find tells you how long you were gone.
-  Squishing raises a persisted "population pressure" that slows arrivals; it
-  decays over a day.
+- **Pick Up a Crumb** (`m`) — a crumb rides your cursor; your next click drops
+  it (that click never squishes). Every fly converges on it and feeds; a crumb
+  lasts about 80 s per fly. Finishing crumbs makes new flies arrive sooner.
+- **Squish on Click** (`k`, on) — click a grounded fly (26 px hitbox) and it
+  becomes a splat with the flattened fly in it, solid for 2.5 minutes, fading
+  over the next. You have to earn it: a fast cursor trips the real escape
+  circuit first.
+- **Swarms while you're away** — newcomers fly in from a screen edge. At the
+  desk: every 1.5–4 minutes, up to 4. Idle a minute or more: the cap climbs
+  with time gone (about 0.6 per minute, to 160 overnight) and flies attract
+  flies — each one present shortens the next wait 8%, floor 5 s. Squishing
+  raises a persisted "population pressure" that slows arrivals; it decays over
+  a day. Stress-tested at 240 flies: 120 fps, ~60% of one core.
+- **Coming back** — your first input after being away scatters everything
+  beyond the home population of 4: they take off away from the cursor and
+  leave the screen. The brain fly startles but stays.
+- **Idle pause** — after an hour without input the scene stops rendering
+  (GPU idle; camera and sound stop too). It resumes when the display wakes or
+  on input, and the arrivals that would have happened stream in from the
+  edges, so the swarm is there to be seen before you scatter it.
 - **Shooing** — when a fly escapes your cursor or hand it may keep going and
   leave the screen for good instead of landing elsewhere (25% alone, up to 85%
   in a crowd). Clear a swarm by chasing it.
+- **Launch at Login** (`l`) — via `SMAppService`; only from the installed .app.
+- **Grooming wag** — the abdomen wags in bursts while grooming (DNg11-driven).
 - **Sound** (`u`, on, quiet) — a synthesized wingbeat buzz while a fly is
   airborne (pitch follows effort, panned to its position) and a splat on squish.
   No audio files; everything is generated in `FlySound.swift`.

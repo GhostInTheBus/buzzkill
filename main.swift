@@ -11,6 +11,7 @@
 
 import Cocoa
 import SceneKit
+import ServiceManagement
 
 // MARK: - Desktop overlay scene
 
@@ -794,7 +795,16 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
     private var spawnTimer: CGFloat = 0
     private var nextSpawnIn: CGFloat = rnd(60...240)
     private var userIdle: CGFloat = 0        // seconds since the user last touched anything
-    private var maxFlies: Int { userIdle > 60 ? 12 : 4 }   // they gather while you're away
+    private var wasAway = false
+    // DESKTOPFLY_SWARM_TEST=N: spawn a fly a second up to N (stress test)
+    private let swarmTest = ProcessInfo.processInfo.environment["DESKTOPFLY_SWARM_TEST"].flatMap { Int($0) ?? 48 }
+    // the "appropriate" population when you're at the desk
+    private let homeFlies = 4
+    // away: the cap climbs with time gone (~0.6/min), so overnight is a proper swarm
+    private var maxFlies: Int {
+        if let n = swarmTest { return n }
+        return userIdle > 60 ? min(160, homeFlies + Int(userIdle / 60 * 0.6)) : homeFlies
+    }
     var sound: FlySound?   // nil = muted (set from the main thread via setSound)
     // crumbs: food the user drops; every fly converges and feeds, the crumb shrinks
     private var crumbs: [(node: SCNNode, pos: CGPoint, amount: CGFloat)] = []
@@ -814,8 +824,29 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
     }
     private func scheduleNextSpawn(_ base: ClosedRange<CGFloat>? = nil) {
         spawnTimer = 0
-        // away from the desk: a new fly every 25-70 s; at it: every 1.5-4 min
-        nextSpawnIn = rnd(base ?? (userIdle > 60 ? 25...70 : 90...240)) * (1 + pressure)
+        if swarmTest != nil { nextSpawnIn = 1; return }
+        // at the desk: a new fly every 1.5-4 min. Away: 20-50 s, and flies attract
+        // flies — each one present shortens the wait by 8%, floor 5 s.
+        let away = userIdle > 60
+        var wait = rnd(base ?? (away ? 20...50 : 90...240)) * (1 + pressure)
+        if away { wait = max(5, wait * pow(0.92, CGFloat(flies.count))) }
+        nextSpawnIn = wait
+    }
+
+    // the user is back: anything beyond the home population scatters off screen
+    private func disperseSwarm(from p: CGPoint?) {
+        let extra = flies.count - homeFlies
+        guard extra > 0 else { return }
+        let threat = p ?? .zero
+        // keep the brain fly (index 0); send a random `extra` of the rest away
+        var pool = Array(flies.dropFirst()).shuffled()
+        for fly in pool.prefix(extra) where fly.state != .flying {
+            fly.forceLeave = true
+            fly.startFlight(bounds: bounds, awayFrom: threat, escape: true)
+        }
+        pool.removeAll()
+        loomOverride = 0.6          // the brain fly startles too (but stays)
+        scheduleNextSpawn()
     }
     private let attractDebug = ProcessInfo.processInfo.environment["DESKTOPFLY_ATTRACT_DEBUG"] != nil
     private var attractDbgClock: CGFloat = 0
@@ -915,6 +946,40 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
         return splat
     }
 
+    private var heldCrumb: SCNNode?
+    func pickUpCrumb() {
+        enqueue { c in
+            if c.heldCrumb == nil {
+                let n = c.makeCrumbNode()
+                n.position = SCNVector3(c.mouseScene?.x ?? 0, c.mouseScene?.y ?? 0, 0.3)
+                c.scene.rootNode.addChildNode(n)
+                c.heldCrumb = n
+            }
+        }
+    }
+    func placeHeldCrumb(at p: CGPoint) {
+        enqueue { c in
+            guard let n = c.heldCrumb else { return }
+            n.position = SCNVector3(p.x, p.y, 0.3)
+            c.crumbs.append((n, p, 1))
+            c.heldCrumb = nil
+        }
+    }
+    private func makeCrumbNode() -> SCNNode {
+        let crumb = SCNNode()
+        crumb.name = "crumb"
+        let tone = NSColor(calibratedRed: 0.86, green: 0.72, blue: 0.46, alpha: 1)
+        for k in 0..<4 {
+            let cyl = SCNCylinder(radius: k == 0 ? 7 : rnd(2.5...4.5), height: 1.2)
+            cyl.firstMaterial?.diffuse.contents = tone
+            let n = SCNNode(geometry: cyl)
+            n.eulerAngles.x = .pi / 2
+            let a = rnd(0...(2 * CGFloat.pi)), d: CGFloat = k == 0 ? 0 : rnd(4...9)
+            n.position = SCNVector3(cos(a) * d, sin(a) * d, 0)
+            crumb.addChildNode(n)
+        }
+        return crumb
+    }
     func dropCrumb(at p: CGPoint) {
         enqueue { c in
             let crumb = SCNNode()
@@ -932,6 +997,15 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
             }
             c.scene.rootNode.addChildNode(crumb)
             c.crumbs.append((crumb, p, 1))
+        }
+    }
+
+    // after an idle pause: the flies that would have arrived meanwhile stream in now
+    func catchUpArrivals() {
+        enqueue { c in
+            let want = c.maxFlies - c.flies.count
+            for _ in 0..<max(0, want) { c.spawnFlyFromEdge() }
+            c.scheduleNextSpawn()
         }
     }
 
@@ -1118,6 +1192,7 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
 
     private func advanceSimulation(dt: CGFloat, mouse: CGPoint?, hand: CGPoint?, handExtent: CGFloat) {
         sceneTime += Double(dt)
+        if let held = heldCrumb, let m = mouse { held.position = SCNVector3(m.x, m.y, 0.3) }
         // squish marks: solid for 2.5 min, fade over the next minute
         if !splats.isEmpty {
             splats.removeAll { sp in
@@ -1142,6 +1217,9 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
             flies.removeAll { if $0.gone { $0.node.removeFromParentNode(); return true }; return false }
             if flies.isEmpty { scheduleNextSpawn(8...30) }
         }
+        // coming back after being away: the swarm scatters on your first input
+        if userIdle > 60 { wasAway = true }
+        else if wasAway && userIdle < 3 { wasAway = false; disperseSwarm(from: mouse) }
         // a crowd scatters more readily than a lone fly
         let chance = clampf(0.25 + 0.06 * CGFloat(flies.count), 0, 0.85)
         for fly in flies { fly.leaveChance = chance }
@@ -1261,6 +1339,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var attractItem: NSMenuItem?
     var squishItem: NSMenuItem?
     var soundItem: NSMenuItem?
+    var loginItem: NSMenuItem?
     var soundOn = true
     var flySound: FlySound?
     static let soundKey = "flySound"
@@ -1340,6 +1419,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let loc = NSEvent.mouseLocation
             self.coordinator.setMouse(CGPoint(x: loc.x - self.screenFrame.midX,
                                               y: loc.y - self.screenFrame.midY))
+            let idleNow = userIdleSeconds()
+            if !self.paused {
+                if !self.autoPaused && idleNow > AppDelegate.autoPauseAfter { self.setAutoPaused(true, idle: idleNow) }
+                else if self.autoPaused && idleNow < 3 { self.setAutoPaused(false, idle: idleNow) }
+            }
+            if self.autoPaused { return }   // nothing to feed a stopped scene; avoids piling up actions
             // typing = substrate vibration (when, never what)
             let keyIdle = CGEventSource.secondsSinceLastEventType(.combinedSessionState, eventType: .keyDown)
             self.typingLevel += ((keyIdle < 0.6 ? 1.0 : 0.0) - self.typingLevel) * 0.15
@@ -1374,10 +1459,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard let self else { return }
             let loc = NSEvent.mouseLocation
             let p = CGPoint(x: loc.x - self.screenFrame.midX, y: loc.y - self.screenFrame.midY)
-            self.coordinator.trySquish(at: p)
+            if self.holdingCrumb {
+                // the click that drops a carried crumb doesn't squish anything
+                self.holdingCrumb = false
+                self.coordinator.placeHeldCrumb(at: p)
+            } else {
+                self.coordinator.trySquish(at: p)
+            }
             self.coordinator.injectTap(at: p)
         }
 
+        // screen wakes (lid, key, unlock): resume before the first input so the swarm is visible
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self, self.autoPaused else { return }
+            self.setAutoPaused(false, idle: userIdleSeconds())
+        }
         // if the current display disappears, retreat to the main screen
         NotificationCenter.default.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification,
@@ -1436,7 +1533,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let att = item("Attract to Cursor: Off", #selector(toggleAttract), "t")
         attractItem = att
         menu.addItem(att)
-        menu.addItem(item("Drop Crumb at Cursor", #selector(dropCrumb), "m"))
+        menu.addItem(item("Pick Up a Crumb (click to drop)", #selector(dropCrumb), "m"))
+        let login = item("Launch at Login", #selector(toggleLogin), "l")
+        loginItem = login
+        menu.addItem(login)
+        refreshLoginItem()
         let snd = item("Sound: On", #selector(toggleSound), "u")
         soundItem = snd
         menu.addItem(snd)
@@ -1456,6 +1557,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.menu = menu
     }
 
+    func setAutoPaused(_ on: Bool, idle: Double) {
+        guard on != autoPaused else { return }
+        autoPaused = on
+        scnView.isPlaying = !on
+        coordinator.lastTime = nil
+        if on {
+            if cameraOn { cameraSense?.stop() }
+            flySound?.stop()
+        } else {
+            if cameraOn { _ = cameraSense?.start() }
+            if soundOn { flySound?.start() }
+            // let the cap know how long we were gone, then fill in the arrivals
+            coordinator.setAmbient(typing: 0, sleepy: false, tempo: thermalTempo(),
+                                   activity: circadianActivity(hour: 12), idle: CGFloat(idle))
+            coordinator.catchUpArrivals()
+        }
+    }
     @objc func togglePause(_ sender: NSMenuItem) {
         paused.toggle()
         scnView.isPlaying = !paused
@@ -1487,6 +1605,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func toggleAttract() { setAttract(!attractOn) }
     @objc func toggleSquish() { setSquish(!squishOn) }
     @objc func toggleSound() { setSound(!soundOn) }
+    // Launch at Login via SMAppService (macOS 13+). Only works from a real .app
+    // bundle in /Applications; from a bare binary the item is disabled.
+    @objc func toggleLogin() {
+        guard #available(macOS 13, *) else { return }
+        let svc = SMAppService.mainApp
+        do {
+            if svc.status == .enabled { try svc.unregister() } else { try svc.register() }
+        } catch {
+            fputs("launch at login: \(error)\n", stderr)
+        }
+        refreshLoginItem()
+    }
+    func refreshLoginItem() {
+        guard #available(macOS 13, *), Bundle.main.bundleIdentifier != nil else {
+            loginItem?.isEnabled = false; return
+        }
+        switch SMAppService.mainApp.status {
+        case .enabled: loginItem?.state = .on; loginItem?.title = "Launch at Login"
+        case .requiresApproval: loginItem?.state = .mixed; loginItem?.title = "Launch at Login (approve in System Settings)"
+        default: loginItem?.state = .off; loginItem?.title = "Launch at Login"
+        }
+    }
     func setSound(_ on: Bool) {
         soundOn = on
         if on {
@@ -1501,9 +1641,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         UserDefaults.standard.set(on, forKey: AppDelegate.soundKey)
         soundItem?.title = on ? "Sound: On" : "Sound: Off"
     }
+    var holdingCrumb = false
+    // idle pause: after an hour without input, stop rendering (GPU) until wake/input
+    var autoPaused = false
+    static let autoPauseAfter: Double = 3600
     @objc func dropCrumb() {
-        let loc = NSEvent.mouseLocation
-        coordinator.dropCrumb(at: CGPoint(x: loc.x - screenFrame.midX, y: loc.y - screenFrame.midY))
+        holdingCrumb = true
+        coordinator.pickUpCrumb()
     }
     func setSquish(_ on: Bool) {
         squishOn = on

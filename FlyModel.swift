@@ -262,7 +262,9 @@ func buildFlyModel() -> FlyModel {
     abdMat.shininess = 0.35
     abdGeo.materials = [abdMat]
     let abdomen = SCNNode(geometry: abdGeo)
-    abdomen.position = SCNVector3(0, -6.5, 5.6)
+    // pivot at the waist so the abdomen can wag; position compensates (center stays at y=-6.5)
+    abdomen.pivot = SCNMatrix4MakeTranslation(0, 3.5, 0)
+    abdomen.position = SCNVector3(0, -1.25, 5.6)
     abdomen.scale = SCNVector3(0.9, 1.5, 0.75)
     root.addChildNode(abdomen)
 
@@ -377,9 +379,11 @@ final class Fly {
     var heading: CGFloat = rnd(0...(2 * .pi))
     // scene point the fly is drawn toward while walking (cursor attractant), or nil
     var attractTarget: CGPoint?
+    private var abdWag: CGFloat = 0
     // shooing: chance (set by the coordinator from crowd size) that an escape
     // from a threat leaves the screen for good instead of landing elsewhere
     var leaveChance: CGFloat = 0
+    var forceLeave = false      // set by the coordinator when a returning user disperses a swarm
     private(set) var leaving = false
     private(set) var gone = false
     private var attractGrounded: CGFloat = 0   // seconds on the ground since the last hop
@@ -509,7 +513,7 @@ final class Fly {
             }
         }
         // shooed: keep going in the away direction until off the screen
-        if let a = awayFrom, toward == nil, rnd(0...1) < leaveChance {
+        if let a = awayFrom, toward == nil, forceLeave || rnd(0...1) < leaveChance {
             var dir = CGPoint(x: pos.x - a.x, y: pos.y - a.y)
             let len = hypot(dir.x, dir.y)
             if len < 1 { let ang = rnd(0...(2 * CGFloat.pi)); dir = CGPoint(x: cos(ang), y: sin(ang)) }
@@ -679,6 +683,11 @@ final class Fly {
         let breathe = state == .sleeping ? (1 + 0.05 * sin(time * 1.1))
                                          : (1 + 0.03 * sin(time * 3.0))
         model.abdomen.scale = SCNVector3(0.9, 1.5, 0.75 * breathe)
+        // abdominal wag during grooming (DNg11-driven), in bursts
+        let wagOn = state == .grooming && sin(time * 0.9) > 0.2
+        let wagTarget: CGFloat = wagOn ? sin(time * 17) * 0.28 : 0
+        abdWag += (wagTarget - abdWag) * lag(wagOn ? 40 : 8, dt)
+        model.abdomen.eulerAngles.z = abdWag
         syncNode()
     }
 
