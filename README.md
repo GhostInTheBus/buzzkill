@@ -162,6 +162,15 @@ that the behavior comes from real wiring.
 - **Shooing** — when a fly escapes your cursor or hand it may keep going and
   leave the screen for good instead of landing elsewhere (25% alone, up to 85%
   in a crowd). Clear a swarm by chasing it.
+- **Stats** — top of the menu: squished, got away (swings that missed within
+  90 px of a fly), peak swarm, longest absence. Persisted. No confetti.
+- **Legible misses** — a swing that misses near a fly plays a short rising zip:
+  *it saw you*. Fairness has to be audible.
+- **Density drone** — a low hum that grows with the crowd (silent at the home
+  population of 4, full at the cap). Silence after the scatter is the reward.
+- **Hitbox** (`x`) — Normal 26 px · Forgiving 34 · Tiny 18. The difficulty knob.
+- **Persistent splats** — marks survive relaunch (goo only, with their remaining
+  life), so a filthy desktop is the record of a long war.
 - **Launch at Login** (`l`) — via `SMAppService`; only from the installed .app.
 - **Grooming wag** — the abdomen wags in bursts while grooming (DNg11-driven).
 - **Sound** (`u`, on, quiet) — a synthesized wingbeat buzz while a fly is

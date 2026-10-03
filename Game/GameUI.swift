@@ -14,7 +14,10 @@ final class GameUI: NSObject {
     // persisted toggles
     static let attractKey = "attractCursor", squishKey = "squishClick", soundKey = "flySound", cameraKey = "cameraSwat"
     private(set) var attractOn = false, squishOn = true, soundOn = true, cameraOn = false
-    private var attractItem, squishItem, soundItem, cameraItem, loginItem: NSMenuItem?
+    private var attractItem, squishItem, soundItem, cameraItem, loginItem, statsItem, hitboxItem: NSMenuItem?
+    static let hitboxKey = "hitbox"
+    private static let hitboxes: [(name: String, px: CGFloat)] = [("Normal", 26), ("Forgiving", 34), ("Tiny", 18)]
+    private var hitboxIndex = 0
 
     private var flySound: FlySound?
     private var cameraSense: CameraSense?
@@ -32,6 +35,9 @@ final class GameUI: NSObject {
             it.target = self
             return it
         }
+        statsItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        menu.addItem(statsItem!)
+        menu.addItem(.separator())
         attractItem = item("Attract to Cursor: Off", #selector(toggleAttract), "t")
         menu.addItem(attractItem!)
         menu.addItem(item("Pick Up a Crumb (click to drop)", #selector(pickUpCrumb), "m"))
@@ -42,6 +48,8 @@ final class GameUI: NSObject {
         menu.addItem(soundItem!)
         squishItem = item("Squish on Click: On", #selector(toggleSquish), "k")
         menu.addItem(squishItem!)
+        hitboxItem = item("Hitbox: Normal", #selector(cycleHitbox), "x")
+        menu.addItem(hitboxItem!)
         cameraItem = item("Camera Swat: Off", #selector(toggleCamera), "c")
         menu.addItem(cameraItem!)
         refreshCameraItem()
@@ -54,6 +62,21 @@ final class GameUI: NSObject {
         setSquish(d.object(forKey: GameUI.squishKey) as? Bool ?? true)
         setSound(d.object(forKey: GameUI.soundKey) as? Bool ?? true)
         if d.bool(forKey: GameUI.cameraKey), CameraSense.authorization == .authorized { startCamera() }
+        setHitbox(d.integer(forKey: GameUI.hitboxKey))
+    }
+
+    /// Called when the menu is about to open.
+    func refresh() {
+        statsItem?.title = coordinator.game.stats.summary
+    }
+
+    @objc func cycleHitbox() { setHitbox((hitboxIndex + 1) % GameUI.hitboxes.count) }
+    private func setHitbox(_ i: Int) {
+        hitboxIndex = max(0, min(GameUI.hitboxes.count - 1, i))
+        let h = GameUI.hitboxes[hitboxIndex]
+        coordinator.enqueue { c in c.game.splats.hitRadius = h.px }
+        UserDefaults.standard.set(hitboxIndex, forKey: GameUI.hitboxKey)
+        hitboxItem?.title = "Hitbox: \(h.name)"
     }
 
     // MARK: input routing (main thread)

@@ -4,3 +4,5 @@ DesktopFly
 nohup.out
 /*.png
 dist/
+DesktopFly-arm64
+DesktopFly-x86_64

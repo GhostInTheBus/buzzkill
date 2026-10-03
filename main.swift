@@ -953,6 +953,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     func menuNeedsUpdate(_ menu: NSMenu) {
         // only offer the display hop when there is somewhere to hop to
         moveDisplayItem?.isHidden = NSScreen.screens.count < 2
+        gameUI.refresh()
     }
 
     var window: NSWindow!

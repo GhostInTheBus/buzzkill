@@ -8,6 +8,7 @@ final class Game {
     let population = Population()
     let crumbs = Crumbs()
     let splats = Splats()
+    let stats = Stats()
     var attractOn = false
     var sound: FlySound?   // nil = muted (set from the main thread)
 
@@ -15,21 +16,28 @@ final class Game {
     private var attractDbgClock: CGFloat = 0
 
     init() {
-        crumbs.onFinished = { [weak self] in self?.population.bumpPressure(-0.15) }
+        crumbs.onFinished = { [weak self] in self?.population.bumpPressure(-0.15); self?.stats.noteCrumb() }
     }
 
     /// A click on the desktop: squish if a grounded fly is under it.
     func squish(at p: CGPoint, world: GameWorld) {
-        guard splats.squish(at: p, world: world) != nil else { return }
+        guard splats.squish(at: p, world: world) != nil else {
+            // a swing that missed near a fly: it saw you coming. Make that audible.
+            if splats.enabled, splats.nearMiss(at: p, world: world) { stats.noteMiss(); sound?.miss() }
+            return
+        }
         sound?.splat()
+        stats.noteKill()
         population.noteSquish(world: world)
     }
 
     /// Before the brain steps: world housekeeping that doesn't need the sim.
     func preSim(world: GameWorld, dt: CGFloat, mouse: CGPoint?, idle: CGFloat, mouseSpeed: CGFloat, handSpeed: CGFloat) {
-        splats.update(dt: dt)
+        splats.update(dt: dt, world: world)
         crumbs.update(world: world, dt: dt, mouse: mouse)
         buzz(world: world)
+        stats.notePopulation(world.flies.count)
+        stats.noteIdle(TimeInterval(idle))
         population.update(world: world, dt: dt, idle: idle, mouse: mouse, mouseSpeed: mouseSpeed, handSpeed: handSpeed)
     }
 
@@ -69,5 +77,8 @@ final class Game {
         } else {
             snd.setBuzz(level: 0, pitch: 1, pan: 0)
         }
+        // the hum of a crowd: nothing at the home population, full at the cap
+        let n = world.flies.count
+        snd.setDrone(level: n <= population.homeFlies ? 0 : Float(min(1, log(Double(n - population.homeFlies + 1)) / log(157))))
     }
 }
