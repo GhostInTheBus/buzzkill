@@ -1,27 +1,26 @@
-// Camera sense: a hand in front of the webcam, reported as a position on the
-// fly's plane plus how much of the frame it fills (a hand lunging at the
-// screen grows fast). Frames are analyzed on-device with Vision's hand-pose
-// detector and dropped; nothing is stored or transmitted. Opt-in from the
+// Camera sense: sudden movement in front of the webcam, reported as where it
+// is (centroid, normalized, mirrored so your right is screen right) and how
+// much of the frame is moving. Plain frame differencing on a 64x48 sample —
+// no face or hand model, so anything counts: a hand, a head, a cat. Frames
+// are compared and dropped; nothing is stored or transmitted. Opt-in from the
 // menu — this is the one sense that needs a permission.
 
 import AVFoundation
-import Vision
 
 final class CameraSense: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
-    /// Called on the capture queue with the most prominent hand: normalized
-    /// point (0..1, origin bottom-left, x mirrored so your right is screen
-    /// right) and its normalized bounding-box diagonal; nil/0 when no hand.
+    /// Called on the capture queue: motion centroid (0..1, origin bottom-left,
+    /// x mirrored) and the moving fraction of the frame scaled to ~0..1; nil/0
+    /// when nothing moves.
     var onHand: ((CGPoint?, CGFloat) -> Void)?
 
     private let session = AVCaptureSession()
-    private let queue = DispatchQueue(label: "desktopfly.camera", qos: .userInitiated)
-    private let request: VNDetectHumanHandPoseRequest = {
-        let r = VNDetectHumanHandPoseRequest()
-        r.maximumHandCount = 2
-        return r
-    }()
-    private var frameCount = 0
+    private let queue = DispatchQueue(label: "buzzkill.camera", qos: .userInitiated)
     private var configured = false
+    private var frameCount = 0
+    private let gw = 64, gh = 48
+    private var prev: [UInt8]?
+    private let debug = ProcessInfo.processInfo.environment["DESKTOPFLY_CAMERA_DEBUG"] != nil
+    private var dbgMax: CGFloat = 0, dbgFrames = 0
 
     static var authorization: AVAuthorizationStatus { AVCaptureDevice.authorizationStatus(for: .video) }
     static func requestAccess(_ done: @escaping (Bool) -> Void) {
@@ -36,7 +35,7 @@ final class CameraSense: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
                     ?? AVCaptureDevice.default(for: .video),
                   let input = try? AVCaptureDeviceInput(device: dev) else { return false }
             session.beginConfiguration()
-            session.sessionPreset = .vga640x480   // plenty for a hand; cheap
+            session.sessionPreset = .vga640x480
             guard session.canAddInput(input) else { session.commitConfiguration(); return false }
             session.addInput(input)
             let out = AVCaptureVideoDataOutput()
@@ -48,38 +47,56 @@ final class CameraSense: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
             session.commitConfiguration()
             configured = true
         }
+        prev = nil
         queue.async { self.session.startRunning() }
         return true
     }
 
     func stop() {
-        queue.async { self.session.stopRunning() }
+        queue.async { self.session.stopRunning(); self.prev = nil }
         onHand?(nil, 0)
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer,
                        from connection: AVCaptureConnection) {
         frameCount += 1
-        if frameCount % 2 != 0 { return }   // ~15 Hz is enough to catch a swat
+        if frameCount % 2 != 0 { return }   // ~15 Hz is plenty for a swat
         guard let pb = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        let handler = VNImageRequestHandler(cvPixelBuffer: pb, orientation: .up, options: [:])
-        try? handler.perform([request])
-        var best: (CGPoint, CGFloat)? = nil
-        for obs in request.results ?? [] {
-            guard let pts = try? obs.recognizedPoints(.all) else { continue }
-            let good = pts.values.filter { $0.confidence > 0.3 }
-            guard good.count >= 4 else { continue }
-            var minX = 1.0, minY = 1.0, maxX = 0.0, maxY = 0.0, sx = 0.0, sy = 0.0
-            for p in good {
-                minX = min(minX, p.x); maxX = max(maxX, p.x)
-                minY = min(minY, p.y); maxY = max(maxY, p.y)
-                sx += p.x; sy += p.y
+        CVPixelBufferLockBaseAddress(pb, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(pb, .readOnly) }
+        guard let base = CVPixelBufferGetBaseAddress(pb) else { return }
+        let w = CVPixelBufferGetWidth(pb), h = CVPixelBufferGetHeight(pb)
+        let stride = CVPixelBufferGetBytesPerRow(pb)
+        let px = base.assumingMemoryBound(to: UInt8.self)
+
+        // luminance on a coarse grid
+        var cur = [UInt8](repeating: 0, count: gw * gh)
+        for gy in 0..<gh {
+            let y = gy * h / gh
+            for gx in 0..<gw {
+                let x = gx * w / gw
+                let o = y * stride + x * 4
+                // BGRA -> approx luma
+                cur[gy * gw + gx] = UInt8((Int(px[o]) * 29 + Int(px[o + 1]) * 150 + Int(px[o + 2]) * 77) >> 8)
             }
-            let extent = CGFloat(hypot(maxX - minX, maxY - minY))
-            let n = Double(good.count)
-            let c = CGPoint(x: 1 - sx / n, y: sy / n)   // mirror: your right = screen right
-            if best == nil || extent > best!.1 { best = (c, extent) }
         }
-        onHand?(best?.0, best?.1 ?? 0)
+        defer { prev = cur }
+        guard let p = prev else { return }
+
+        // changed cells: count + centroid
+        var n = 0, sx = 0, sy = 0
+        for i in 0..<(gw * gh) where abs(Int(cur[i]) - Int(p[i])) > 28 {
+            n += 1; sx += i % gw; sy += i / gw
+        }
+        let frac = CGFloat(n) / CGFloat(gw * gh)
+        if debug {
+            dbgMax = max(dbgMax, frac); dbgFrames += 1
+            if dbgFrames >= 15 { fputs(String(format: "camera motion: max %.3f of frame this second\n", dbgMax), stderr); dbgMax = 0; dbgFrames = 0 }
+        }
+        guard frac > 0.004 else { onHand?(nil, 0); return }   // sensor noise floor
+        // mirror x; Vision-style origin bottom-left (grid row 0 is the top)
+        let c = CGPoint(x: 1 - CGFloat(sx) / CGFloat(n) / CGFloat(gw), y: 1 - CGFloat(sy) / CGFloat(n) / CGFloat(gh))
+        // a hand wave is ~5-15% of the frame; a lunge at the screen, 30%+
+        onHand?(c, min(1, frac * 4))
     }
 }

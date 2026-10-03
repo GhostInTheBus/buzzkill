@@ -9,7 +9,7 @@ pest is the **game** and lives in `Game/`, `Senses/` and `Audio/`.
 |---|---|---|
 | engine | `main.swift` (scene, CLI modes, `SignalBuilder`, `Coordinator`, `AppDelegate`), `FlyModel.swift`, `BeetleModel.swift`, `Sim.swift`, `Locomotor.swift`, `LegDynamics.swift`, `LocomotorTests.swift`, `BrainView.swift`, `Environment.swift`, `etl*.py`, `data/` | upstream |
 | game | `Game/Game.swift` (orchestration), `Game/Population.swift` (arrivals, swarms, disperse, spook, shooing, pressure), `Game/Crumbs.swift`, `Game/Squish.swift`, `Game/Attraction.swift` (+ `--attracttest`), `Game/GameUI.swift` (menu, toggles, camera/sound/login, idle pause), `Game/GameWorld.swift` (the protocol the game sees) | this fork |
-| senses | `Senses/CameraSense.swift` (webcam hand-pose), `Senses/HandLoom.swift` (hand → loom geometry) | this fork |
+| senses | `Senses/CameraSense.swift` (webcam motion by frame differencing), `Senses/HandLoom.swift` (camera motion → loom: expansion = approach, frame side = eye) | this fork |
 | audio | `Audio/FlySound.swift` (synthesized buzz + splat) | this fork |
 | packaging | `package.sh`, `packaging/Info.plist` | this fork |
 

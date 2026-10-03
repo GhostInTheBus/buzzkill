@@ -9,7 +9,7 @@ cd "$(dirname "$0")"
 if [[ " $* " == *" --universal "* ]]; then
   # build.sh compiles for the host; do it once per arch and glue with lipo
   SRCS=(main.swift FlyModel.swift LegDynamics.swift Locomotor.swift LocomotorTests.swift BeetleModel.swift Sim.swift BrainView.swift Environment.swift Game/*.swift Senses/*.swift Audio/*.swift)
-  FW=(-framework Cocoa -framework SceneKit -framework AVFoundation -framework Vision)
+  FW=(-framework Cocoa -framework SceneKit -framework AVFoundation)
   for arch in arm64 x86_64; do
     swiftc -module-cache-path "${TMPDIR:-/tmp}/desktopfly-module-cache-$arch" -O -swift-version 5 \
       -target "$arch-apple-macos13.0" -o "Buzzkill-$arch" "${SRCS[@]}" "${FW[@]}"

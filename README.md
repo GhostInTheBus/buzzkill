@@ -51,9 +51,12 @@ A 🪰 appears in the menu bar. Everything below lives there.
   Idle a minute or more: the cap climbs about 1.5 a minute, to 160. Come back
   and your first input scatters everything beyond 4. Shake the cursor hard
   (or wave at the camera) and the room empties until you've been idle again.
-- **Camera Swat** (`c`, off by default) — the webcam watches for a hand; a swat
-  at the screen triggers the real escape. On-device, frames discarded. The one
-  feature that needs a permission.
+- **Camera Swat** (`c`, off by default) — the webcam becomes the fly's eyes.
+  Plain frame differencing (no face or hand model) finds movement; how fast it
+  *grows* in the frame drives the real LC4/LPLC2 looming detectors (expansion =
+  something approaching), the half of the frame it's in picks the eye, a fast
+  sweep is wind. Lunge at the screen and the Giant Fiber fires. On-device,
+  frames compared and dropped. The one feature that needs a permission.
 - **Stats** at the top of the menu: squished, got away, peak swarm, longest
   absence.
 
