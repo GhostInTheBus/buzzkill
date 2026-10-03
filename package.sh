@@ -1,6 +1,6 @@
 #!/bin/zsh
 # Build DesktopFly and wrap it in a .app bundle.
-#   ./package.sh              -> ./dist/DesktopFly.app (native arch)
+#   ./package.sh              -> ./dist/Buzzkill.app (native arch)
 #   ./package.sh --install    -> also copies to /Applications and launches it
 #   ./package.sh --universal  -> arm64 + x86_64 binary (for releases)
 # Needs Xcode Command Line Tools (swiftc, sips, iconutil, lipo). No sudo.
@@ -12,20 +12,20 @@ if [[ " $* " == *" --universal "* ]]; then
   FW=(-framework Cocoa -framework SceneKit -framework AVFoundation -framework Vision)
   for arch in arm64 x86_64; do
     swiftc -module-cache-path "${TMPDIR:-/tmp}/desktopfly-module-cache-$arch" -O -swift-version 5 \
-      -target "$arch-apple-macos13.0" -o "DesktopFly-$arch" "${SRCS[@]}" "${FW[@]}"
+      -target "$arch-apple-macos13.0" -o "Buzzkill-$arch" "${SRCS[@]}" "${FW[@]}"
   done
-  lipo -create -output DesktopFly DesktopFly-arm64 DesktopFly-x86_64 && rm -f DesktopFly-arm64 DesktopFly-x86_64
+  lipo -create -output Buzzkill DesktopFly-arm64 DesktopFly-x86_64 && rm -f DesktopFly-arm64 DesktopFly-x86_64
   echo "Built universal ./DesktopFly ($(lipo -archs DesktopFly))"
 else
   ./build.sh
 fi
 
-DIST=dist; APP="$DIST/DesktopFly.app"
+DIST=dist; APP="$DIST/Buzzkill.app"
 rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 # The binary looks for data/ next to itself (Sim.swift findDataDir), so it
 # lives in MacOS/, not Resources/.
-cp DesktopFly "$APP/Contents/MacOS/DesktopFly"
+cp Buzzkill "$APP/Contents/MacOS/Buzzkill"
 cp -R data "$APP/Contents/MacOS/data"
 cp packaging/Info.plist "$APP/Contents/Info.plist"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
@@ -41,8 +41,8 @@ rm -rf "$(dirname "$ICONSET")"
 echo "Built $APP"
 
 if [[ " $* " == *" --install "* ]]; then
-  TARGET=/Applications/DesktopFly.app
-  pkill -x DesktopFly 2>/dev/null || true
+  TARGET=/Applications/Buzzkill.app
+  pkill -x Buzzkill 2>/dev/null || true
   while pgrep -x DesktopFly >/dev/null; do sleep 0.1; done
   # Remove rather than overwrite: replacing a signed binary in place can get
   # it killed by the kernel on Apple Silicon.

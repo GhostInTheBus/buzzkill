@@ -1108,7 +1108,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.title = "🪰"
         let menu = NSMenu()
-        menu.addItem(withTitle: "Desktop Fly", action: nil, keyEquivalent: "")
+        menu.addItem(withTitle: "Buzzkill", action: nil, keyEquivalent: "")
         menu.addItem(withTitle: dataInfo, action: nil, keyEquivalent: "")
         menu.addItem(.separator())
         func item(_ title: String, _ sel: Selector, _ key: String) -> NSMenuItem {
