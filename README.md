@@ -97,6 +97,29 @@ A 🪰 item appears in the menu bar; quit from there. The fly wanders your
 desktop on a transparent, click-through overlay — it never intercepts your
 mouse or keyboard.
 
+### macOS .app bundle
+
+To run it as a regular app (icon, `/Applications`, no terminal):
+
+```sh
+./package.sh --install   # builds dist/DesktopFly.app, copies it to /Applications, launches it
+```
+
+Or grab `DesktopFly-<version>.zip` from the
+[Releases](https://github.com/GhostInTheBus/desktop-fly/releases) page of this fork.
+The bundle is ad-hoc signed, not notarized, so on first launch of a downloaded
+copy macOS will say it's damaged or from an unidentified developer. Clear the
+quarantine flag and it opens normally:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/DesktopFly.app
+```
+
+The packaging script and bundle are this fork's only addition. The fly — the
+connectome extraction, neural model, body, everything you actually see — is
+the work of [Denis Shiryaev](https://github.com/DenisSergeevitch) in the
+[upstream repo](https://github.com/DenisSergeevitch/desktop-fly).
+
 ### Windows
 
 An Electron + three.js port with the same connectome extracts, neural models, and

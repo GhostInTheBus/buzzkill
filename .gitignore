@@ -3,3 +3,4 @@ DesktopFly
 *.log
 nohup.out
 /*.png
+dist/
