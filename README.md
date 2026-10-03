@@ -155,6 +155,10 @@ that the behavior comes from real wiring.
   (GPU idle; camera and sound stop too). It resumes when the display wakes or
   on input, and the arrivals that would have happened stream in from the
   edges, so the swarm is there to be seen before you scatter it.
+- **Spooking** — shake the cursor hard (or wave at the camera, with Camera
+  Swat on) for about a second and every fly,
+  brain fly included, bolts off screen. Nothing comes back until you've been
+  idle for a minute.
 - **Shooing** — when a fly escapes your cursor or hand it may keep going and
   leave the screen for good instead of landing elsewhere (25% alone, up to 85%
   in a crowd). Clear a swarm by chasing it.

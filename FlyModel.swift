@@ -796,13 +796,13 @@ final class Fly {
             }
             let startHeading = heading
             if let motion = motorMotion { heading += motion.yaw }
+            else { heading += rnd(-1...1) * WANDER_JITTER * sqrt(dt) }
             // attractant: lean the walk toward the target. The locomotor's DNa
             // steering is too weak to be reliably driven, so this is body-level.
             if let tgt = attractTarget {
                 let want = atan2(tgt.y - pos.y, tgt.x - pos.x)
                 heading += angleDiff(heading, want) * lag(1.5, dt)
             }
-            else { heading += rnd(-1...1) * WANDER_JITTER * sqrt(dt) }
             let hw = bounds.width / 2 - EDGE_MARGIN, hh = bounds.height / 2 - EDGE_MARGIN
             if abs(pos.x) > hw || abs(pos.y) > hh {
                 let toCenter = atan2(-pos.y, -pos.x)

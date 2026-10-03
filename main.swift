@@ -796,6 +796,10 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
     private var nextSpawnIn: CGFloat = rnd(60...240)
     private var userIdle: CGFloat = 0        // seconds since the user last touched anything
     private var wasAway = false
+    // spook: shake the cursor hard for a second or so and everything leaves;
+    // nothing comes back until the user has been idle a while
+    private var shake: CGFloat = 0
+    private var spooked = false
     // DESKTOPFLY_SWARM_TEST=N: spawn a fly a second up to N (stress test)
     private let swarmTest = ProcessInfo.processInfo.environment["DESKTOPFLY_SWARM_TEST"].flatMap { Int($0) ?? 48 }
     // the "appropriate" population when you're at the desk
@@ -1218,6 +1222,19 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
             flies.removeAll { if $0.gone { $0.node.removeFromParentNode(); return true }; return false }
             if flies.isEmpty { scheduleNextSpawn(8...30) }
         }
+        // hard cursor shaking builds up; ~1.2 s of it within a couple of seconds spooks the room
+        let fast = hypot(mouseVel.x, mouseVel.y) > 1100 || hypot(handVel.x, handVel.y) > 900
+        shake = clampf(shake + (fast ? dt : -dt * 0.6), 0, 3)
+        if shake > 1.2 && !spooked {
+            spooked = true; shake = 0
+            let threat = mouse ?? .zero
+            for fly in flies where fly.state != .flying {
+                fly.forceLeave = true
+                fly.startFlight(bounds: bounds, awayFrom: threat, escape: true)
+            }
+            loomOverride = 0.6
+        }
+        if spooked && userIdle > 60 { spooked = false; scheduleNextSpawn() }
         // coming back after being away: the swarm scatters on your first input
         if userIdle > 60 { wasAway = true }
         else if wasAway && userIdle < 3 { wasAway = false; disperseSwarm(from: mouse) }
@@ -1226,7 +1243,7 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
         for fly in flies { fly.leaveChance = chance }
         // random arrivals, up to maxFlies
         spawnTimer += dt
-        if flies.count < maxFlies && spawnTimer >= nextSpawnIn {
+        if !spooked && flies.count < maxFlies && spawnTimer >= nextSpawnIn {
             scheduleNextSpawn()
             spawnFlyFromEdge()
         }
