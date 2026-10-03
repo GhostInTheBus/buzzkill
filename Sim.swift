@@ -186,6 +186,8 @@ final class LIFSim {
     var attractTurn: Float = 0   // -1..1, >0 = target on the fly's left
     var attractDrive: Float = 0  // 0..1 forward urge
     var attractGroom: Float = 0  // 0..1, "arrived, feed/clean"
+    var attractFwdGain: Float = 0.008   // ~7 Hz DNp09: a nudge, not a shout (>~20 Hz jams the legs)
+    var attractTurnGain: Float = 0.02   // visible DNa asymmetry; steering itself is body-level
     var activityScale: Float = 1  // circadian / sleep neuromodulation of baseline+noise
     var sensoryGate: Float = 1    // sleep gates sensory input (raised arousal threshold)
 
@@ -376,8 +378,8 @@ final class LIFSim {
             if airPuff > 0.001 { for i in sens { v[i] += airPuff * 0.12 * sensoryGate } }
             // cursor attractant -> DNp09 (walk) + DNa01/02 (steer) + DNg11 (groom)
             if attractDrive > 0.001 {
-                for i in fwd { v[i] += attractDrive * 0.10 * sensoryGate }
-                let turn = attractTurn * attractDrive * 0.22 * sensoryGate
+                for i in fwd { v[i] += attractDrive * attractFwdGain * sensoryGate }
+                let turn = attractTurn * attractDrive * attractTurnGain * sensoryGate
                 if turn > 0 { for i in dnaL { v[i] += turn } } else if turn < 0 { for i in dnaR { v[i] -= turn } }
             }
             if attractGroom > 0.001 { for i in groom { v[i] += attractGroom * 0.16 * sensoryGate } }

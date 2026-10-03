@@ -677,6 +677,73 @@ final class SignalBuilder {
     }
 }
 
+// Cursor-as-attractant inputs for the brain: steer sign by bearing, forward
+// urge by distance, grooming on arrival. Shared by the app loop and --attracttest.
+func attractInputs(fly: Fly, target m: CGPoint) -> (turn: Float, drive: Float, groom: Float) {
+    let rel = CGPoint(x: m.x - fly.pos.x, y: m.y - fly.pos.y)
+    let dist = max(1, hypot(rel.x, rel.y))
+    let f = CGPoint(x: cos(fly.heading), y: sin(fly.heading))
+    let crossZ = (f.x * rel.y - f.y * rel.x) / dist      // >0: target on the left
+    let arrived = dist < 55
+    return (Float(clampf(crossZ * 1.5, -1, 1)),
+            arrived ? 0 : Float(clampf(dist / 350, 0.4, 1)),
+            arrived ? 0.7 : 0)
+}
+
+// Headless: does the attractant actually bring the fly to the target with the
+// locomotor circuit driving the legs? Sweeps gains, prints distance over time.
+func runAttractTest() {
+    guard let data = loadBrainData() else { fputs("no data/ — run etl.py first\n", stderr); exit(1) }
+    let bounds = CGSize(width: 1512, height: 982)
+    let dt: CGFloat = 1.0 / 60.0
+    let target = CGPoint(x: 500, y: 250)
+    let env = ProcessInfo.processInfo.environment
+    let fwdGains: [Float] = (env["FWD"] ?? "0.10,0.04,0.02").split(separator: ",").compactMap { Float($0) }
+    let turnGains: [Float] = (env["TURN"] ?? "0.22,0.08,0.04").split(separator: ",").compactMap { Float($0) }
+    let seconds = CGFloat(Double(env["SECS"] ?? "40") ?? 40)
+    for fg in fwdGains { for tg in turnGains {
+        TestRandom.reset("attract \(fg) \(tg)")
+        let sim = LIFSim(circuit: data.circuit, spikeBus: nil, locomotorCircuit: data.locomotor)
+        sim.attractFwdGain = fg; sim.attractTurnGain = tg
+        let builder = SignalBuilder()
+        let fly = Fly(at: .zero); fly.state = .idle; fly.speed = 0; fly.heading = .pi   // facing away
+        sim.step(400); _ = sim.consumeGF()
+        var line = String(format: "fwd=%.2f turn=%.2f  dist:", fg, tg)
+        var walking = 0, grooming = 0, flying = 0, frames = 0, arrivedAt: CGFloat = -1
+        var t: CGFloat = 0
+        var fwdHz: Float = 0, dnaHz: Float = 0
+        var path: CGFloat = 0, lastPos = fly.pos, hops = 0
+        let attractEnabled = env["ATTRACT"] != "0"
+        while t < seconds {
+            if attractEnabled, fly.state != .flying {
+                let a = attractInputs(fly: fly, target: target)
+                sim.attractTurn = a.turn; sim.attractDrive = a.drive; sim.attractGroom = a.groom
+                fly.attractTarget = a.drive > 0 ? target : nil
+                if fly.attractHop(toward: target, bounds: bounds, dt: dt) { hops += 1 }
+            } else { sim.attractTurn = 0; sim.attractDrive = 0; sim.attractGroom = 0; fly.attractTarget = nil }
+            // body -> brain closed loop, as the app does each frame
+            sim.gaitDrive = Float(fly.walkingIntensity)
+            sim.gaitPhase = Float(fly.gaitPhasePublic)
+            sim.legFeedback = fly.legFeedback
+            sim.step(Int((dt * 1000).rounded()))
+            let sig = builder.make(sim, dt: dt)
+            fly.update(dt: dt, bounds: bounds, mouse: nil, signals: sig)
+            t += dt; frames += 1
+            path += hypot(fly.pos.x - lastPos.x, fly.pos.y - lastPos.y); lastPos = fly.pos
+            fwdHz += sim.rateFwd; dnaHz += max(sim.rateDNaL, sim.rateDNaR)
+            switch fly.state { case .walking: walking += 1; case .grooming: grooming += 1; case .flying: flying += 1; default: break }
+            let d = hypot(target.x - fly.pos.x, target.y - fly.pos.y)
+            if d < 55 && arrivedAt < 0 { arrivedAt = t }
+            if frames % 600 == 0 { line += String(format: " %.0f", d) }
+        }
+        line += String(format: "  arrived=%@ hops=%d path=%.0fpx walk=%d%% groom=%d%% fly=%d%%  fwd=%.0fHz dna=%.0fHz",
+                       arrivedAt < 0 ? "no" : String(format: "%.0fs", arrivedAt), hops, path,
+                       walking * 100 / frames, grooming * 100 / frames, flying * 100 / frames,
+                       fwdHz / Float(frames), dnaHz / Float(frames))
+        print(line); fflush(stdout)
+    } }
+}
+
 // MARK: - Coordinator
 
 final class Coordinator: NSObject, SCNSceneRendererDelegate {
@@ -720,6 +787,36 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
     private var windowLoomL: Float = 0
     private var windowLoomR: Float = 0
     private var attractOn = false
+    // squish-on-click + population: splats fade over minutes, flies arrive at random
+    private var squishOn = true
+    private var splats: [(node: SCNNode, born: TimeInterval)] = []
+    private var sceneTime: TimeInterval = 0
+    private var spawnTimer: CGFloat = 0
+    private var nextSpawnIn: CGFloat = rnd(60...240)
+    private let maxFlies = 3
+    var sound: FlySound?   // nil = muted (set from the main thread via setSound)
+    // crumbs: food the user drops; every fly converges and feeds, the crumb shrinks
+    private var crumbs: [(node: SCNNode, pos: CGPoint, amount: CGFloat)] = []
+    // population pressure: squishing slows arrivals, finished crumbs speed them up.
+    // Persisted, decays toward 0 over a day.
+    private var pressure: CGFloat = {
+        let d = UserDefaults.standard
+        let p = CGFloat(d.double(forKey: "popPressure"))
+        let t = d.double(forKey: "popPressureAt")
+        let days = t > 0 ? (Date().timeIntervalSince1970 - t) / 86400 : 0
+        return max(0, p - CGFloat(days))
+    }()
+    private func bumpPressure(_ delta: CGFloat) {
+        pressure = clampf(pressure + delta, 0, 2)
+        UserDefaults.standard.set(Double(pressure), forKey: "popPressure")
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "popPressureAt")
+    }
+    private func scheduleNextSpawn(_ base: ClosedRange<CGFloat> = 60...240) {
+        spawnTimer = 0
+        nextSpawnIn = rnd(base) * (1 + pressure)
+    }
+    private let attractDebug = ProcessInfo.processInfo.environment["DESKTOPFLY_ATTRACT_DEBUG"] != nil
+    private var attractDbgClock: CGFloat = 0
     private(set) var lastFlyPos = CGPoint.zero
 
     init(bounds: CGSize, sim: LIFSim?) {
@@ -766,6 +863,90 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
     }
     func setMouse(_ p: CGPoint?) { lock.lock(); mouseScene = p; lock.unlock() }
     func setAttract(_ on: Bool) { enqueue { $0.attractOn = on } }
+    func setSquish(_ on: Bool) { enqueue { $0.squishOn = on } }
+    func setSound(_ s: FlySound?) { enqueue { $0.sound = s } }
+
+    // a click on a grounded fly: squish it, leave a mark, let the population recover
+    func trySquish(at p: CGPoint) {
+        enqueue { c in
+            guard c.squishOn else { return }
+            guard let i = c.flies.firstIndex(where: { $0.state != .flying && hypot(p.x - $0.pos.x, p.y - $0.pos.y) < 34 })
+            else { return }
+            let fly = c.flies.remove(at: i)
+            c.sound?.splat()
+            c.scene.rootNode.addChildNode(c.makeSplat(fly: fly))
+            c.splats.append((c.scene.rootNode.childNodes.last!, c.sceneTime))
+            c.bumpPressure(0.25)
+            // a lone fly gone: the next arrival still comes sooner
+            if c.flies.isEmpty { c.scheduleNextSpawn(8...30) }
+        }
+    }
+
+    private func makeSplat(fly: Fly) -> SCNNode {
+        let splat = SCNNode()
+        splat.name = "splat"
+        splat.position = SCNVector3(fly.pos.x, fly.pos.y, 0.3)
+        let goo = NSColor(calibratedRed: 0.24, green: 0.11, blue: 0.08, alpha: 0.9)
+        func blob(_ r: CGFloat, at o: CGPoint, sx: CGFloat = 1) -> SCNNode {
+            let cyl = SCNCylinder(radius: r, height: 0.4)
+            cyl.firstMaterial?.diffuse.contents = goo
+            cyl.firstMaterial?.lightingModel = .constant
+            let n = SCNNode(geometry: cyl)
+            n.eulerAngles.x = .pi / 2          // lie flat on the desktop plane
+            n.position = SCNVector3(o.x, o.y, 0)
+            n.scale = SCNVector3(sx, 1, 1)
+            return n
+        }
+        splat.addChildNode(blob(13, at: .zero, sx: 1.35))
+        for _ in 0..<5 {
+            let a = rnd(0...(2 * CGFloat.pi)), d = rnd(12...27)
+            splat.addChildNode(blob(rnd(2...4.5), at: CGPoint(x: cos(a) * d, y: sin(a) * d)))
+        }
+        // the fly itself, flattened into the goo
+        let body = fly.node
+        body.removeFromParentNode()
+        body.position = SCNVector3(0, 0, 0.25)
+        body.scale = SCNVector3(FLY_SCALE * 1.25, FLY_SCALE * 1.25, 0.08)
+        body.opacity = 0.9
+        splat.addChildNode(body)
+        splat.eulerAngles.z = rnd(0...(2 * CGFloat.pi))
+        return splat
+    }
+
+    func dropCrumb(at p: CGPoint) {
+        enqueue { c in
+            let crumb = SCNNode()
+            crumb.name = "crumb"
+            crumb.position = SCNVector3(p.x, p.y, 0.3)
+            let tone = NSColor(calibratedRed: 0.86, green: 0.72, blue: 0.46, alpha: 1)
+            for k in 0..<4 {
+                let cyl = SCNCylinder(radius: k == 0 ? 7 : rnd(2.5...4.5), height: 1.2)
+                cyl.firstMaterial?.diffuse.contents = tone
+                let n = SCNNode(geometry: cyl)
+                n.eulerAngles.x = .pi / 2
+                let a = rnd(0...(2 * CGFloat.pi)), d: CGFloat = k == 0 ? 0 : rnd(4...9)
+                n.position = SCNVector3(cos(a) * d, sin(a) * d, 0)
+                crumb.addChildNode(n)
+            }
+            c.scene.rootNode.addChildNode(crumb)
+            c.crumbs.append((crumb, p, 1))
+        }
+    }
+
+    private func spawnFlyFromEdge() {
+        let hw = bounds.width / 2 - 30, hh = bounds.height / 2 - 30
+        let p: CGPoint
+        switch TestRandom.integer(in: 0..<4) {
+        case 0: p = CGPoint(x: -hw, y: rnd(-hh...hh))
+        case 1: p = CGPoint(x: hw, y: rnd(-hh...hh))
+        case 2: p = CGPoint(x: rnd(-hw...hw), y: -hh)
+        default: p = CGPoint(x: rnd(-hw...hw), y: hh)
+        }
+        let fly = Fly(at: p)
+        scene.rootNode.addChildNode(fly.node)
+        flies.append(fly)
+        fly.startFlight(bounds: bounds)   // arrives on the wing
+    }
     func setHand(_ p: CGPoint?, extent: CGFloat) {
         lock.lock(); handScene = p; handExtent = extent; lock.unlock()
     }
@@ -854,7 +1035,11 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
         let approach = -(rel.x * mouseVel.x + rel.y * mouseVel.y) / dist
         // loom ~ rate of angular expansion, attenuated with distance
         var loom = clampf(approach / dist * 6, 0, 1) * clampf(1 - dist / 800, 0, 1)
-        loom += clampf((130 - dist) / 130, 0, 1) * 0.5          // hovering close = big object
+        // hovering close = big object. With the cursor as attractant, a parked
+        // cursor is food, not a threat: scale this term by cursor speed so only
+        // a moving/lunging cursor looms up close.
+        let hoverGate: CGFloat = attractOn ? clampf(hypot(mouseVel.x, mouseVel.y) / 250, 0, 1) : 1
+        loom += clampf((130 - dist) / 130, 0, 1) * 0.5 * hoverGate
         loom = clampf(loom + loomOverride, 0, 1)
         // split between eyes by bearing relative to heading
         let f = CGPoint(x: cos(fly.heading), y: sin(fly.heading))
@@ -930,6 +1115,32 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
     }
 
     private func advanceSimulation(dt: CGFloat, mouse: CGPoint?, hand: CGPoint?, handExtent: CGFloat) {
+        sceneTime += Double(dt)
+        // squish marks: solid for 2.5 min, fade over the next minute
+        if !splats.isEmpty {
+            splats.removeAll { sp in
+                let age = sceneTime - sp.born
+                if age > 210 { sp.node.removeFromParentNode(); return true }
+                sp.node.opacity = age > 150 ? CGFloat(1 - (age - 150) / 60) : 1
+                return false
+            }
+        }
+        // buzz: loudest airborne fly, pitch from its effort, panned to its x
+        if let snd = sound {
+            if let f = flies.filter({ $0.state == .flying }).max(by: { $0.effortCurrent < $1.effortCurrent }) {
+                snd.setBuzz(level: Float(0.45 + 0.55 * f.effortCurrent) * Float(0.6 + 0.4 * f.alt),
+                            pitch: Float(0.9 + 0.6 * f.effortCurrent),
+                            pan: Float(clampf(f.pos.x / (bounds.width / 2), -1, 1)))
+            } else {
+                snd.setBuzz(level: 0, pitch: 1, pan: 0)
+            }
+        }
+        // random arrivals, up to maxFlies
+        spawnTimer += dt
+        if flies.count < maxFlies && spawnTimer >= nextSpawnIn {
+            scheduleNextSpawn()
+            spawnFlyFromEdge()
+        }
         var signals: BrainSignals? = nil
         if let sim = sim, let first = flies.first {
             let sensory = computeLoom(fly: first, mouse: mouse, dt: dt)
@@ -942,17 +1153,49 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
             sim.airPuff = max(sensory.puff, handS.puff, Float(typingLevel * 0.30))
             // the cursor as a sugar drop: steer + walk toward it via the real DNs,
             // groom when there. A lunging cursor still looms, so it also still scares.
-            if attractOn, let m = mouse, first.state != .flying {
-                let rel = CGPoint(x: m.x - first.pos.x, y: m.y - first.pos.y)
-                let dist = max(1, hypot(rel.x, rel.y))
-                let f = CGPoint(x: cos(first.heading), y: sin(first.heading))
-                let crossZ = (f.x * rel.y - f.y * rel.x) / dist      // >0: target on the left
-                let arrived = dist < 55
-                sim.attractTurn = Float(clampf(crossZ * 1.5, -1, 1))
-                sim.attractDrive = arrived ? 0 : Float(clampf(dist / 350, 0.4, 1))
-                sim.attractGroom = arrived ? 0.7 : 0
+            // food: crumbs first (every fly), else the cursor if attraction is on (brain fly only)
+            func nearestCrumb(to fly: Fly) -> CGPoint? {
+                crumbs.min { hypot($0.pos.x - fly.pos.x, $0.pos.y - fly.pos.y) < hypot($1.pos.x - fly.pos.x, $1.pos.y - fly.pos.y) }?.pos
+            }
+            let brainTarget = nearestCrumb(to: first) ?? (attractOn ? mouse : nil)
+            if let m = brainTarget, first.state != .flying {
+                let a = attractInputs(fly: first, target: m)
+                sim.attractTurn = a.turn; sim.attractDrive = a.drive; sim.attractGroom = a.groom
+                first.attractTarget = a.drive > 0 ? m : nil
+                _ = first.attractHop(toward: m, bounds: bounds, dt: dt)
             } else {
                 sim.attractTurn = 0; sim.attractDrive = 0; sim.attractGroom = 0
+                first.attractTarget = nil
+            }
+            for fly in flies.dropFirst() {
+                if let m = nearestCrumb(to: fly), fly.state != .flying {
+                    fly.attractTarget = hypot(m.x - fly.pos.x, m.y - fly.pos.y) > 55 ? m : nil
+                    _ = fly.attractHop(toward: m, bounds: bounds, dt: dt)
+                } else { fly.attractTarget = nil }
+            }
+            // feeding: each grounded fly within reach eats; a crumb lasts ~80 s per fly
+            if !crumbs.isEmpty {
+                for i in crumbs.indices {
+                    let eaters = flies.filter { $0.state != .flying && hypot($0.pos.x - crumbs[i].pos.x, $0.pos.y - crumbs[i].pos.y) < 60 }.count
+                    if eaters > 0 { crumbs[i].amount -= dt * 0.0125 * CGFloat(eaters) }
+                    let sc = max(0.15, crumbs[i].amount)
+                    crumbs[i].node.scale = SCNVector3(sc, sc, 1)
+                }
+                let gone = crumbs.filter { $0.amount <= 0.1 }
+                for g in gone { g.node.removeFromParentNode(); bumpPressure(-0.15) }
+                crumbs.removeAll { $0.amount <= 0.1 }
+            }
+            if attractDebug {
+                attractDbgClock += dt
+                if attractDbgClock >= 1 {
+                    attractDbgClock = 0
+                    let m = mouse ?? .zero
+                    fputs(String(format: "attract on=%d state=%@ fly=(%.0f,%.0f) mouse=(%.0f,%.0f) turn=%.2f drive=%.2f groom=%.2f | DNaL=%.1f DNaR=%.1f fwd=%.1f groomHz=%.1f loom=%.1f legs=%d\n",
+                                 attractOn ? 1 : 0, "\(first.state)", first.pos.x, first.pos.y, m.x, m.y,
+                                 sim.attractTurn, sim.attractDrive, sim.attractGroom,
+                                 sim.rateDNaL, sim.rateDNaR, sim.rateFwd, sim.rateGroom, sim.rateLoom,
+                                 sim.locomotor?.commands != nil ? 1 : 0), stderr)
+                }
             }
             // body -> brain: leg proprioception from the current gait
             sim.gaitDrive = Float(first.walkingIntensity)
@@ -1006,6 +1249,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     var cameraOn = false
     static let cameraKey = "cameraSwat"
     var attractItem: NSMenuItem?
+    var squishItem: NSMenuItem?
+    var soundItem: NSMenuItem?
+    var soundOn = true
+    var flySound: FlySound?
+    static let soundKey = "flySound"
+    var squishOn = true
+    static let squishKey = "squishClick"
     var attractOn = false
     static let attractKey = "attractCursor"
     let windowSense = WindowSense()
@@ -1069,6 +1319,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         setupStatusItem()
         if UserDefaults.standard.bool(forKey: AppDelegate.attractKey) { setAttract(true) }
+        setSquish(UserDefaults.standard.object(forKey: AppDelegate.squishKey) as? Bool ?? true)
+        setSound(UserDefaults.standard.object(forKey: AppDelegate.soundKey) as? Bool ?? true)
         if UserDefaults.standard.bool(forKey: AppDelegate.cameraKey), CameraSense.authorization == .authorized {
             startCamera()
         }
@@ -1110,8 +1362,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         clickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             guard let self else { return }
             let loc = NSEvent.mouseLocation
-            self.coordinator.injectTap(at: CGPoint(x: loc.x - self.screenFrame.midX,
-                                                   y: loc.y - self.screenFrame.midY))
+            let p = CGPoint(x: loc.x - self.screenFrame.midX, y: loc.y - self.screenFrame.midY)
+            self.coordinator.trySquish(at: p)
+            self.coordinator.injectTap(at: p)
         }
 
         // if the current display disappears, retreat to the main screen
@@ -1172,6 +1425,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let att = item("Attract to Cursor: Off", #selector(toggleAttract), "t")
         attractItem = att
         menu.addItem(att)
+        menu.addItem(item("Drop Crumb at Cursor", #selector(dropCrumb), "m"))
+        let snd = item("Sound: On", #selector(toggleSound), "u")
+        soundItem = snd
+        menu.addItem(snd)
+        let sq = item("Squish on Click: On", #selector(toggleSquish), "k")
+        squishItem = sq
+        menu.addItem(sq)
         let cam = item("Camera Swat: Off", #selector(toggleCamera), "c")
         cameraItem = cam
         menu.addItem(cam)
@@ -1214,6 +1474,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func removeFly() { coordinator.removeFly() }
     @objc func scareAll() { coordinator.scareAll() }
     @objc func toggleAttract() { setAttract(!attractOn) }
+    @objc func toggleSquish() { setSquish(!squishOn) }
+    @objc func toggleSound() { setSound(!soundOn) }
+    func setSound(_ on: Bool) {
+        soundOn = on
+        if on {
+            let fs = flySound ?? FlySound()
+            flySound = fs
+            fs.start()
+            coordinator.setSound(fs.running ? fs : nil)
+        } else {
+            coordinator.setSound(nil)
+            flySound?.stop()
+        }
+        UserDefaults.standard.set(on, forKey: AppDelegate.soundKey)
+        soundItem?.title = on ? "Sound: On" : "Sound: Off"
+    }
+    @objc func dropCrumb() {
+        let loc = NSEvent.mouseLocation
+        coordinator.dropCrumb(at: CGPoint(x: loc.x - screenFrame.midX, y: loc.y - screenFrame.midY))
+    }
+    func setSquish(_ on: Bool) {
+        squishOn = on
+        coordinator.setSquish(on)
+        UserDefaults.standard.set(on, forKey: AppDelegate.squishKey)
+        squishItem?.title = on ? "Squish on Click: On" : "Squish on Click: Off"
+    }
     func setAttract(_ on: Bool) {
         attractOn = on
         coordinator.setAttract(on)
@@ -1292,6 +1578,7 @@ if let i = args.firstIndex(of: "--brainshot") {
 if args.contains("--simtest") {
     runSimtest()
 }
+if args.contains("--attracttest") { runAttractTest(); exit(0) }
 if args.contains("--behaviortest") {
     runBehaviorTest()
 }

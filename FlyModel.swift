@@ -375,6 +375,24 @@ final class Fly {
 
     var pos: CGPoint
     var heading: CGFloat = rnd(0...(2 * .pi))
+    // scene point the fly is drawn toward while walking (cursor attractant), or nil
+    var attractTarget: CGPoint?
+    private var attractGrounded: CGFloat = 0   // seconds on the ground since the last hop
+    private var attractCooldown: CGFloat = 0
+
+    /// Attractant far away: flies hop to food rather than walk (motor-mode walking
+    /// covers ~1 px/s). Takes off after settling for a moment; returns true on takeoff.
+    func attractHop(toward p: CGPoint, bounds: CGSize, dt: CGFloat) -> Bool {
+        attractCooldown = max(0, attractCooldown - dt)
+        guard state == .idle || state == .walking || state == .grooming else { attractGrounded = 0; return false }
+        attractGrounded += dt
+        let dist = hypot(p.x - pos.x, p.y - pos.y)
+        guard dist > 90, attractGrounded > 1.2, attractCooldown == 0 else { return false }
+        startFlight(bounds: bounds, effort: rnd(0.35...0.6), toward: p)
+        attractGrounded = 0
+        attractCooldown = 3.5
+        return true
+    }
     var speed: CGFloat = 30
     var state: State = .walking
     var stateTimer: CGFloat = rnd(1.5...4)
@@ -446,7 +464,7 @@ final class Fly {
     }
 
     func startFlight(bounds: CGSize, awayFrom: CGPoint? = nil, escape: Bool = false,
-                     effort: CGFloat? = nil) {
+                     effort: CGFloat? = nil, toward: CGPoint? = nil) {
         setState(.flying)
         ledge = nil
         ledgeHeading = nil
@@ -457,8 +475,14 @@ final class Fly {
         let hw = bounds.width / 2 - EDGE_MARGIN, hh = bounds.height / 2 - EDGE_MARGIN
         var target = CGPoint.zero
         var chosen = false
+        // flight to an attractant: land just short of it, inside the screen
+        if let t = toward {
+            let ang = rnd(0...(2 * CGFloat.pi)), off = rnd(18...40)
+            target = CGPoint(x: clampf(t.x + cos(ang) * off, -hw, hw), y: clampf(t.y + sin(ang) * off, -hh, hh))
+            chosen = true
+        }
         // casual flights often land on a window edge
-        if !escape, awayFrom == nil, !terrain.isEmpty, rnd(0...1) < 0.45 {
+        if !chosen, !escape, awayFrom == nil, !terrain.isEmpty, rnd(0...1) < 0.45 {
             let L = terrain[TestRandom.integer(in: 0..<terrain.count)]
             if L.x1 - L.x0 > 90 {
                 target = CGPoint(x: rnd((L.x0 + 25)...(L.x1 - 25)), y: L.y)
@@ -746,6 +770,12 @@ final class Fly {
             }
             let startHeading = heading
             if let motion = motorMotion { heading += motion.yaw }
+            // attractant: lean the walk toward the target. The locomotor's DNa
+            // steering is too weak to be reliably driven, so this is body-level.
+            if let tgt = attractTarget {
+                let want = atan2(tgt.y - pos.y, tgt.x - pos.x)
+                heading += angleDiff(heading, want) * lag(1.5, dt)
+            }
             else { heading += rnd(-1...1) * WANDER_JITTER * sqrt(dt) }
             let hw = bounds.width / 2 - EDGE_MARGIN, hh = bounds.height / 2 - EDGE_MARGIN
             if abs(pos.x) > hw || abs(pos.y) > hh {

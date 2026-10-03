@@ -122,22 +122,38 @@ the work of [Denis Shiryaev](https://github.com/DenisSergeevitch) in the
 
 ### Fork additions (`senses` branch)
 
-Two opt-in senses, both off by default, both in the 🪰 menu:
+All opt-in or toggleable from the 🪰 menu. The fly, its brain and body are
+unchanged and are the work of [Denis Shiryaev](https://github.com/DenisSergeevitch).
+What is and isn't neurons is spelled out, because the whole point of this app is
+that the behavior comes from real wiring.
 
-- **Attract to Cursor** (`t`) — the cursor acts like a sugar drop. The real
-  steering (DNa01/DNa02) and forward-walking (DNp09) neurons get a synthetic
-  drive toward it, and the grooming DN (DNg11) fires on arrival. There is no
-  gustatory circuit in this extract, so this is an added input in the same
-  spirit as loom — not a pathway from the data. The loom pathway stays live,
-  so a lunging cursor still scares the fly off.
-- **Camera Swat** (`c`) — the webcam watches for a hand (Vision hand-pose,
+- **Attract to Cursor** (`t`, off by default) — the cursor as a sugar drop. The
+  real steering (DNa01/02), forward-walking (DNp09) and grooming (DNg11)
+  neurons get a light synthetic drive so the brain window shows the pull and
+  the fly grooms on arrival. The approach itself is **scripted flight**: with
+  the MaleCNS leg circuit driving the body, walking covers about 1 px/s
+  (measured headless, see `--attracttest`), so the fly hops to the target and
+  lands just short of it, the way a real fly reaches food. A parked cursor no
+  longer counts as a looming threat while this is on; a lunging one still does.
+- **Drop Crumb at Cursor** (`m`) — food. Every fly converges on it and feeds;
+  a crumb lasts about 80 s per fly. Finishing crumbs makes new flies arrive sooner.
+- **Squish on Click** (`k`, on) — click a grounded fly and it becomes a splat
+  with the flattened fly in it, solid for 2.5 minutes, fading over the next.
+  You have to earn it: a fast cursor trips the real escape circuit first.
+- **Random arrivals** — up to 3 flies; newcomers fly in from a screen edge every
+  1–4 minutes (8–30 s if you squished the last one). Squishing raises a
+  persisted "population pressure" that slows arrivals; it decays over a day.
+- **Sound** (`u`, on, quiet) — a synthesized wingbeat buzz while a fly is
+  airborne (pitch follows effort, panned to its position) and a splat on squish.
+  No audio files; everything is generated in `FlySound.swift`.
+- **Camera Swat** (`c`, off) — the webcam watches for a hand (Vision hand-pose,
   on-device, frames discarded) and feeds it into the same loom / air-puff
   pathway as the cursor, so a swat at the screen triggers the real giant-fiber
-  escape. This is the one sense that needs a permission (Camera), which is
-  why it is not upstream and off by default.
+  escape. The one feature that needs a permission (Camera).
 
-The fly itself is unchanged and is the work of
-[Denis Shiryaev](https://github.com/DenisSergeevitch).
+Diagnostics added: `./DesktopFly --attracttest` (headless gain sweep with the
+locomotor active; `FWD`, `TURN`, `SECS`, `ATTRACT=0` env vars) and
+`DESKTOPFLY_ATTRACT_DEBUG=1` for a per-second brain/body readout.
 
 ### Windows
 
