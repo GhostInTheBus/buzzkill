@@ -144,8 +144,8 @@ final class GameUI: NSObject {
             if hearingOn { hearing?.stop() }
             flySound?.stop()
         } else {
-            if cameraOn { _ = cameraSense?.start() }
-            if hearingOn { _ = hearing?.start() }
+            if cameraOn { cameraSense?.start { _ in } }
+            if hearingOn { hearing?.start { _ in } }
             if soundOn { flySound?.start() }
             // let the cap know how long we were gone, then fill in the arrivals
             coordinator.setAmbient(typing: 0, sleepy: false, tempo: thermalTempo(),
@@ -239,10 +239,14 @@ final class GameUI: NSObject {
     private func startHearing() {
         let h = hearing ?? Hearing()
         hearing = h
-        hearingOn = h.start()
-        coordinator.setHearing(hearingOn ? h : nil)
-        UserDefaults.standard.set(hearingOn, forKey: GameUI.hearingKey)
-        refreshHearingItem()
+        hearingItem?.title = "Hearing (mic): starting…"
+        h.start { [weak self] ok in
+            guard let self else { return }
+            self.hearingOn = ok
+            self.coordinator.setHearing(ok ? h : nil)
+            UserDefaults.standard.set(ok, forKey: GameUI.hearingKey)
+            self.refreshHearingItem()
+        }
     }
     private func refreshHearingItem() {
         switch Hearing.authorization {
@@ -281,9 +285,13 @@ final class GameUI: NSObject {
             let scene = p.map { CGPoint(x: ($0.x - 0.5) * sf.width, y: ($0.y - 0.5) * sf.height) }
             self.coordinator.setHand(scene, extent: extent)
         }
-        cameraOn = cs.start()
-        UserDefaults.standard.set(cameraOn, forKey: GameUI.cameraKey)
-        refreshCameraItem()
+        cameraItem?.title = "Camera Swat: starting…"
+        cs.start { [weak self] ok in
+            guard let self else { return }
+            self.cameraOn = ok
+            UserDefaults.standard.set(ok, forKey: GameUI.cameraKey)
+            self.refreshCameraItem()
+        }
     }
     private func stopCamera() {
         cameraSense?.stop()

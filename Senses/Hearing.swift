@@ -20,8 +20,18 @@ final class Hearing {
         AVCaptureDevice.requestAccess(for: .audio) { ok in DispatchQueue.main.async { done(ok) } }
     }
 
-    func start() -> Bool {
-        guard !running else { return true }
+    private let queue = DispatchQueue(label: "buzzkill.hearing")
+
+    /// Starts the mic tap off the main thread; `done(ok)` on main.
+    func start(_ done: @escaping (Bool) -> Void) {
+        if running { done(true); return }
+        queue.async {
+            let ok = self.startNow()
+            DispatchQueue.main.async { done(ok) }
+        }
+    }
+
+    private func startNow() -> Bool {
         let eng = AVAudioEngine()
         let input = eng.inputNode
         let fmt = input.outputFormat(forBus: 0)

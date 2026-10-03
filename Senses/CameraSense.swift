@@ -27,29 +27,33 @@ final class CameraSense: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate 
         AVCaptureDevice.requestAccess(for: .video) { ok in DispatchQueue.main.async { done(ok) } }
     }
 
-    /// Returns false if no usable camera could be configured.
-    func start() -> Bool {
-        if !configured {
-            // prefer the built-in camera over virtual ones (OBS etc.)
-            guard let dev = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .unspecified)
-                    ?? AVCaptureDevice.default(for: .video),
-                  let input = try? AVCaptureDeviceInput(device: dev) else { return false }
-            session.beginConfiguration()
-            session.sessionPreset = .vga640x480
-            guard session.canAddInput(input) else { session.commitConfiguration(); return false }
-            session.addInput(input)
-            let out = AVCaptureVideoDataOutput()
-            out.alwaysDiscardsLateVideoFrames = true
-            out.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
-            out.setSampleBufferDelegate(self, queue: queue)
-            guard session.canAddOutput(out) else { session.commitConfiguration(); return false }
-            session.addOutput(out)
-            session.commitConfiguration()
-            configured = true
+    /// Configures and starts the camera off the main thread (device setup can
+    /// block while the system permission prompt is up — never do it on main).
+    /// `done(false)` on the main thread if no usable camera could be configured.
+    func start(_ done: @escaping (Bool) -> Void) {
+        queue.async {
+            if !self.configured {
+                // prefer the built-in camera over virtual ones (OBS etc.)
+                guard let dev = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .unspecified)
+                        ?? AVCaptureDevice.default(for: .video),
+                      let input = try? AVCaptureDeviceInput(device: dev) else { DispatchQueue.main.async { done(false) }; return }
+                self.session.beginConfiguration()
+                self.session.sessionPreset = .vga640x480
+                guard self.session.canAddInput(input) else { self.session.commitConfiguration(); DispatchQueue.main.async { done(false) }; return }
+                self.session.addInput(input)
+                let out = AVCaptureVideoDataOutput()
+                out.alwaysDiscardsLateVideoFrames = true
+                out.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA]
+                out.setSampleBufferDelegate(self, queue: self.queue)
+                guard self.session.canAddOutput(out) else { self.session.commitConfiguration(); DispatchQueue.main.async { done(false) }; return }
+                self.session.addOutput(out)
+                self.session.commitConfiguration()
+                self.configured = true
+            }
+            self.prev = nil
+            self.session.startRunning()
+            DispatchQueue.main.async { done(true) }
         }
-        prev = nil
-        queue.async { self.session.startRunning() }
-        return true
     }
 
     func stop() {
