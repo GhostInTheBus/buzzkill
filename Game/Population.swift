@@ -19,8 +19,18 @@ final class Population {
     /// Crumbs draw a crowd: each crumb dropped adds room for three more flies
     /// (up to +12), who arrive within seconds and stay. Fades by one every 5 min.
     private(set) var crumbDraw: CGFloat = 0
-    /// The population the desk settles at right now (home + what crumbs drew in).
-    var settled: Int { homeFlies + Int(crumbDraw.rounded(.up)) }
+    /// Flies the user asked for from the menu. They stay until squished or shooed
+    /// off; each one that goes gives its seat back.
+    private(set) var invited = 0
+    /// The population the desk settles at right now (home + crumb crowd + invited).
+    var settled: Int { homeFlies + Int(crumbDraw.rounded(.up)) + invited }
+
+    func invite(_ n: Int, world: GameWorld) {
+        let room = max(0, 160 - world.flies.count)
+        let k = min(n, room)
+        invited += k
+        for _ in 0..<k { spawnFromEdge(world: world) }
+    }
 
     func noteCrumbPlaced() {
         crumbDraw = min(12, crumbDraw + 3)
@@ -68,6 +78,7 @@ final class Population {
     /// A squish happened: pressure up; a lone fly gone means the next comes sooner.
     func noteSquish(world: GameWorld) {
         bumpPressure(0.25)
+        if world.flies.count < settled { invited = max(0, invited - 1) }
         if world.flies.isEmpty { scheduleNextSpawn(8...30, count: 0) }
     }
 
@@ -124,7 +135,9 @@ final class Population {
         crumbDraw = max(0, crumbDraw - dt / 300)
         // shooed flies that made it off screen
         if world.flies.contains(where: { $0.gone }) {
+            let before = world.flies.count
             world.flies.removeAll { if $0.gone { $0.node.removeFromParentNode(); return true }; return false }
+            invited = max(0, invited - (before - world.flies.count))
             if world.flies.isEmpty { scheduleNextSpawn(8...30, count: 0) }
         }
         // hard cursor shaking (or hand waving) builds up; ~1.2 s of it within a

@@ -11,4 +11,6 @@ protocol GameWorld: AnyObject {
     func startle(_ strength: CGFloat)
     /// Seconds since the brain fly's Giant Fiber last fired (large if never).
     var brainEscapeAge: CGFloat { get }
+    /// Cursor velocity in scene px/s (for smears).
+    var cursorVelocity: CGPoint { get }
 }

@@ -36,6 +36,12 @@ A 🪰 appears in the menu bar. Everything below lives there.
 
 ## How to play
 
+- **Add 5 Flies** (`5`) — five more fly in and stay until you squish or shoo them.
+- **Four kinds of splat**, decided by how you hit it: a moving cursor *smears*
+  along its path, a dead-center click *bursts* (rays, far-flung drops, a
+  detached leg), a clip at the edge of the hitbox only *glances* (small mark,
+  the body thrown clear), anything else is a round *blot*. Four goo colors.
+  The body ends up splayed — wings knocked out, legs bent wrong.
 - **Squish** — click a grounded fly. Approach slowly: a fast cursor trips the
   real looming → escape reflex before your click lands. **Difficulty** (`x`)
   doesn't change the hitbox (always 26 px); it dulls or sharpens the fly's

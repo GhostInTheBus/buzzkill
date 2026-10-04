@@ -772,6 +772,7 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
     func pickUpCrumb() { enqueue { c in c.game.crumbs.pickUp(world: c, at: c.mouseScene ?? .zero) } }
     func placeHeldCrumb(at p: CGPoint) { enqueue { c in c.game.crumbs.place(world: c, at: p) } }
     func catchUpArrivals() { enqueue { c in c.game.population.catchUp(world: c) } }
+    func inviteFlies(_ n: Int) { enqueue { c in c.game.population.invite(n, world: c) } }
     func setHand(_ p: CGPoint?, extent: CGFloat) {
         lock.lock(); handScene = p; handExtent = extent; lock.unlock()
     }
@@ -950,6 +951,7 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
 
 extension Coordinator: GameWorld {
     func startle(_ strength: CGFloat) { loomOverride = max(loomOverride, strength) }
+    var cursorVelocity: CGPoint { mouseVel }
     var brainEscapeAge: CGFloat { escapeAge }
 }
 
@@ -1219,6 +1221,8 @@ if args.contains("--simtest") {
 if args.contains("--attracttest") { runAttractTest(); exit(0) }
 if args.contains("--populationtest") { runPopulationTest() }
 if args.contains("--gfstat") { runGFStat(); exit(0) }
+if args.contains("--motionprofile") { runMotionProfile(); exit(0) }
+if let i = args.firstIndex(of: "--splattest") { runSplatTest(path: args.count > i + 1 ? args[i + 1] : "splats.png"); exit(0) }
 if let i = args.firstIndex(of: "--looktest") {
     if args.contains("--beetle") { BODY_FORM = .beetle }
     if args.contains("--detailed") { BODY_FORM = .flyDetailed }

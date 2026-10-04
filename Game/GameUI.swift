@@ -54,6 +54,7 @@ final class GameUI: NSObject {
         attractItem = item("Attract to Cursor: Off", #selector(toggleAttract), "t")
         menu.addItem(attractItem!)
         menu.addItem(item("Pick Up a Crumb (click to drop)", #selector(pickUpCrumb), "m"))
+        menu.addItem(item("Add 5 Flies", #selector(addFive), "5"))
         loginItem = item("Launch at Login", #selector(toggleLogin), "l")
         menu.addItem(loginItem!)
         refreshLoginItem()
@@ -181,6 +182,7 @@ final class GameUI: NSObject {
     @objc func toggleAttract() { setAttract(!attractOn) }
     @objc func toggleSquish() { setSquish(!squishOn) }
     @objc func toggleSound() { setSound(!soundOn) }
+    @objc func addFive() { coordinator.inviteFlies(5) }
     @objc func pickUpCrumb() {
         holdingCrumb = true
         coordinator.pickUpCrumb()

@@ -12,6 +12,7 @@ private final class StubWorld: GameWorld {
     let scene = SCNScene()
     var startles = 0
     var brainEscapeAge: CGFloat = 99
+    var cursorVelocity = CGPoint.zero
     func startle(_ strength: CGFloat) { startles += 1 }
 }
 
