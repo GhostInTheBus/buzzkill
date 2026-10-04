@@ -49,6 +49,7 @@ let SWING_DUR: CGFloat = 0.035
 /// same `FlyModel` contract, so the behavior layer never branches on it.
 enum BodyForm: String {
     case fly = "fruit fly"
+    case flyDetailed = "fruit fly (detailed)"
     case beetle = "stag beetle"
 }
 var BODY_FORM: BodyForm = .fly
@@ -56,6 +57,7 @@ var BODY_FORM: BodyForm = .fly
 func buildBody() -> FlyModel {
     switch BODY_FORM {
     case .fly:    return buildFlyModel()
+    case .flyDetailed: return buildDetailedFlyModel()
     case .beetle: return buildBeetleModel()
     }
 }

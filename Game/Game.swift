@@ -9,6 +9,7 @@ final class Game {
     let crumbs = Crumbs()
     let splats = Splats()
     let stats = Stats()
+    let shadows = FlyShadows()
     var attractOn = false
     var sound: FlySound?   // nil = muted (set from the main thread)
     var hearing: Hearing?  // nil = mic off (set from the main thread)
@@ -59,6 +60,7 @@ final class Game {
         splats.update(dt: dt, world: world)
         crumbs.update(world: world, dt: dt, mouse: mouse)
         buzz(world: world)
+        shadows.update(flies: world.flies, scene: world.scene)
         stats.notePopulation(world.flies.count)
         stats.noteIdle(TimeInterval(idle))
         population.update(world: world, dt: dt, idle: idle, mouse: mouse, mouseSpeed: mouseSpeed, handSpeed: handSpeed)

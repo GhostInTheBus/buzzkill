@@ -97,6 +97,21 @@ whole game layer: crumbs, squishing, arrivals, scattering, stats. There is no
 feeding or olfactory circuit in the data; the attractant is a synthetic input
 in the same spirit as the author's loom.
 
+## Two looks
+
+| classic (upstream) | detailed (this project, default) |
+|---|---|
+| ![classic body](assets/body-classic.png) | ![detailed body](assets/body-detailed.png) |
+
+Same proportions, same skeleton, same behavior — the detailed body restyles it
+toward "stylized-real": glass wings with veins you can see the abdomen through,
+faceted brick-red eyes, glossy chitin, bristles, legs that taper and darken, a
+soft contact shadow that slides away and fades as the fly climbs, and a raking
+key light with a cool rim so the body has a shaded side. Switch from the menu
+(`y`: detailed → classic → stag beetle). 160 detailed flies hold 85 fps here
+(classic: 113); `./Buzzkill --looktest out.png [--detailed] [--actual]` renders
+the comparison above.
+
 ## Two brains, two licenses
 
 The app runs on either of two extracts of the same circuit:

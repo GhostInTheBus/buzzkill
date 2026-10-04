@@ -1032,6 +1032,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         setupStatusItem()
         gameUI.restore()
+        // the detailed body is the app's default; the engine's own default stays the classic one
+        requestedBody = BodyForm(rawValue: UserDefaults.standard.string(forKey: "bodyForm") ?? "") ?? .flyDetailed
+        coordinator.setBodyForm(requestedBody)
+        refreshBodyItem()
 
         mouseTimer = Timer.scheduledTimer(withTimeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
             guard let self else { return }
@@ -1180,13 +1184,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc func toggleBody() {
         // BODY_FORM itself is only ever mutated on the render thread (see the
         // threading model); the menu tracks what it asked for, for the label.
-        requestedBody = requestedBody == .beetle ? .fly : .beetle
+        let order: [BodyForm] = [.flyDetailed, .fly, .beetle]
+        requestedBody = order[((order.firstIndex(of: requestedBody) ?? 0) + 1) % order.count]
         coordinator.setBodyForm(requestedBody)
+        UserDefaults.standard.set(requestedBody.rawValue, forKey: "bodyForm")
         refreshBodyItem()
     }
     private func refreshBodyItem() {
         // the item offers the OTHER form, so it reads as an action
-        bodyItem?.title = requestedBody == .beetle ? "Body: Fruit Fly" : "Body: Stag Beetle"
+        switch requestedBody {
+        case .flyDetailed: bodyItem?.title = "Body: Fruit Fly (detailed) — switch to classic"
+        case .fly: bodyItem?.title = "Body: Fruit Fly (classic) — switch to Stag Beetle"
+        case .beetle: bodyItem?.title = "Body: Stag Beetle — switch to Fruit Fly (detailed)"
+        }
     }
 }
 
@@ -1209,6 +1219,11 @@ if args.contains("--simtest") {
 if args.contains("--attracttest") { runAttractTest(); exit(0) }
 if args.contains("--populationtest") { runPopulationTest() }
 if args.contains("--gfstat") { runGFStat(); exit(0) }
+if let i = args.firstIndex(of: "--looktest") {
+    if args.contains("--beetle") { BODY_FORM = .beetle }
+    if args.contains("--detailed") { BODY_FORM = .flyDetailed }
+    runLookTest(path: args.count > i + 1 ? args[i + 1] : "look.png"); exit(0)
+}
 if args.contains("--behaviortest") {
     runBehaviorTest()
 }
