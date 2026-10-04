@@ -130,6 +130,13 @@ func buildDetailedFlyModel() -> FlyModel {
     // `rigid` and merged into a few meshes at the end: ~45 draw calls become ~6,
     // which is what lets a 160-fly swarm hold frame rate.
     let rigid = SCNNode()
+    // The head is its own flattened mesh on a neck joint, so it can turn.
+    let neck = SCNVector3(0, 6.9, 6.0)
+    let headParts = SCNNode()
+    func onHead(_ n: SCNNode) {
+        n.position = SCNVector3(n.position.x - neck.x, n.position.y - neck.y, n.position.z - neck.z)
+        headParts.addChildNode(n)
+    }
     let chitinDark = NSColor(calibratedRed: 0.15, green: 0.10, blue: 0.06, alpha: 1)
 
     // thorax: glossy, striped, with a scutellum behind it
@@ -163,7 +170,7 @@ func buildDetailedFlyModel() -> FlyModel {
     let head = SCNNode(geometry: headGeo)
     head.position = SCNVector3(0, 9.0, 6.0)
     head.scale = SCNVector3(1.0, 0.85, 0.9)
-    rigid.addChildNode(head)
+    onHead(head)
 
     let eyeGeo = SCNSphere(radius: 2.15)
     eyeGeo.segmentCount = 20
@@ -175,7 +182,7 @@ func buildDetailedFlyModel() -> FlyModel {
         let eye = SCNNode(geometry: eyeGeo)
         eye.position = SCNVector3(side * 2.2, 9.6, 6.4)
         eye.scale = SCNVector3(0.82, 1.0, 1.15)
-        rigid.addChildNode(eye)
+        onHead(eye)
     }
 
     // antennae: a bulb and a branched arista
@@ -191,16 +198,16 @@ func buildDetailedFlyModel() -> FlyModel {
         let bulb = SCNNode(geometry: bulbGeo)
         bulb.position = SCNVector3(side * 0.85, 11.5, 6.2)
         bulb.scale = SCNVector3(1, 1.5, 1)
-        rigid.addChildNode(bulb)
+        onHead(bulb)
         let arista = SCNNode(geometry: hair(2.6, 0.06))
         arista.position = SCNVector3(side * 1.45, 12.4, 6.5)
         arista.eulerAngles = SCNVector3(0, 0, -side * 0.75)
-        rigid.addChildNode(arista)
+        onHead(arista)
         for k in 0..<3 {
             let b = SCNNode(geometry: hair(0.9, 0.04))
             b.position = SCNVector3(side * (1.2 + 0.32 * CGFloat(k)), 12.2 + 0.28 * CGFloat(k), 6.5)
             b.eulerAngles = SCNVector3(0, 0, -side * 1.9)
-            rigid.addChildNode(b)
+            onHead(b)
         }
     }
     let probGeo = SCNCone(topRadius: 0.6, bottomRadius: 0.22, height: 2.4)
@@ -208,7 +215,7 @@ func buildDetailedFlyModel() -> FlyModel {
     let prob = SCNNode(geometry: probGeo)
     prob.position = SCNVector3(0, 10.4, 4.6)
     prob.eulerAngles = SCNVector3(-0.5, 0, 0)
-    rigid.addChildNode(prob)
+    onHead(prob)
 
     // bristles: swept back over the thorax and scutellum, a few on the head
     func bristle(_ x: CGFloat, _ y: CGFloat, _ z: CGFloat, len: CGFloat, back: CGFloat = 1.05, out: CGFloat = 0) {
@@ -225,11 +232,18 @@ func buildDetailedFlyModel() -> FlyModel {
         bristle(side * 1.5, 0.2, 10.0, len: 3.2)
         bristle(side * 3.2, -0.6, 8.6, len: 2.4, out: -side * 0.35)
         bristle(side * 1.0, -2.6, 9.0, len: 3.4, back: 1.25)            // scutellar
-        bristle(side * 1.0, 9.6, 8.7, len: 1.8, back: 0.7)              // head
-        bristle(side * 0.5, 8.4, 8.8, len: 1.6, back: 1.2)
+        for (x, y, z, len, back) in [(side * 1.0, 9.6, 8.7, 1.8, 0.7), (side * 0.5, 8.4, 8.8, 1.6, 1.2)] as [(CGFloat, CGFloat, CGFloat, CGFloat, CGFloat)] {
+            let n = SCNNode(geometry: hair(len))
+            n.position = SCNVector3(x, y, z); n.eulerAngles = SCNVector3(back, 0, 0)
+            onHead(n)                                                    // head bristles turn with the head
+        }
     }
 
     root.addChildNode(rigid.flattenedClone())
+    let headNode = SCNNode()
+    headNode.position = neck
+    headNode.addChildNode(headParts.flattenedClone())
+    root.addChildNode(headNode)
 
     // legs: slimmer, darker toward the feet (same joints as the classic body)
     var legs: [Leg] = []
@@ -275,8 +289,8 @@ func buildDetailedFlyModel() -> FlyModel {
         m.diffuse.minificationFilter = .linear
         m.diffuse.maxAnisotropy = 8
         if side < 0 { m.diffuse.contentsTransform = SCNMatrix4Translate(SCNMatrix4MakeScale(-1, 1, 1), 1, 0, 0) }
-        m.specular.contents = NSColor(calibratedRed: 0.75, green: 0.9, blue: 1.0, alpha: 1)
-        m.shininess = 0.95
+        m.specular.contents = NSColor(calibratedRed: 0.20, green: 0.25, blue: 0.30, alpha: 1)   // a glint, not a strobe
+        m.shininess = 0.6
         m.isDoubleSided = true
         m.writesToDepthBuffer = false
         m.blendMode = .alpha
@@ -310,5 +324,5 @@ func buildDetailedFlyModel() -> FlyModel {
 
     return FlyModel(root: root, legs: legs, foldedWings: foldedWings,
                     blurWingL: bl, blurWingR: br, abdomen: abdomen,
-                    wingFlightSpread: 1.1)
+                    wingFlightSpread: 1.1, head: headNode)
 }

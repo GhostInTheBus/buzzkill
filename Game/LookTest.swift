@@ -145,3 +145,83 @@ func runSplatTest(path: String) {
     cam.camera?.orthographicScale = 70
     offscreenRender(scene, camNode: cam, size: CGSize(width: 1200, height: 560), path: path)
 }
+
+
+/// A contact sheet: one fly doing one thing, frozen at eight moments, left to right.
+///   ./Buzzkill --posetest out.png groom|takeoff|landing|walk [--cursor]
+func runPoseTest(path: String, what: String) {
+    BODY_FORM = .flyDetailed
+    MotionStyle.apply()
+    let bounds = CGSize(width: 1400, height: 1000)
+    let scene = buildScene(bounds: bounds)
+    scene.background.contents = NSColor(calibratedRed: 0.72, green: 0.76, blue: 0.82, alpha: 1)
+    TestRandom.reset("posetest \(what)")
+    let fly = Fly(at: .zero); fly.heading = .pi / 2
+    let dt: CGFloat = 1.0 / 120
+    let cursor: CGPoint? = CommandLine.arguments.contains("--cursor") ? CGPoint(x: 150, y: 60) : nil
+    func step(_ n: Int, force: Fly.State? = nil) {
+        for _ in 0..<n {
+            if let f = force { fly.state = f }
+            fly.update(dt: dt, bounds: bounds, mouse: cursor, signals: nil)
+            if force != nil { fly.pos = .zero; fly.heading = .pi / 2 }
+        }
+        if let f = force { fly.state = f }
+    }
+    var frames: [(SCNNode, String)] = []
+    func snap(_ label: String) {
+        // freeze this pose: rebuild position so the row is evenly spaced
+        fly.update(dt: 0.00001, bounds: bounds, mouse: cursor, signals: nil)
+        frames.append((fly.node.clone(), label))
+    }
+    switch what {
+    case "groom":
+        // three frames of each gesture: rub, rub, rub | wipe x3 | hind x2
+        let env = ProcessInfo.processInfo.environment
+        func f(_ k: String, _ d: CGFloat) -> CGFloat { env[k].flatMap { Double($0) }.map { CGFloat($0) } ?? d }
+        Fly.groomPose = (f("RA", Fly.groomPose.rubAngle), f("RL", Fly.groomPose.rubLift), f("RK", Fly.groomPose.rubKnee),
+                         f("WA", Fly.groomPose.wipeAngle), f("WL", Fly.groomPose.wipeLift), f("WK", Fly.groomPose.wipeKnee),
+                         f("HA", Fly.groomPose.hindAngle), f("HL", Fly.groomPose.hindLift), f("HK", Fly.groomPose.hindKnee))
+        for (mode, n) in [(0, 3), (2, 3), (3, 2)] {
+            Fly.debugGroomMode = mode
+            step(40, force: .grooming)
+            for _ in 0..<n { step(3, force: .grooming); snap("groom \(mode)") }
+        }
+    case "takeoff":
+        step(30, force: .idle)
+        fly.startFlight(bounds: bounds, effort: 0.7)
+        for _ in 0..<8 { snap("takeoff"); step(4) }
+    case "landing":
+        fly.startFlight(bounds: bounds, effort: 0.7)
+        var guardN = 0
+        while fly.flightT < 0.80 && guardN < 2000 { step(1); guardN += 1 }
+        for _ in 0..<8 { snap("landing"); step(9) }
+    case "flight":
+        // mid-flight wingbeat, frame by frame
+        fly.startFlight(bounds: bounds, effort: 0.7)
+        var guardN = 0
+        while fly.flightT < 0.4 && guardN < 2000 { step(1); guardN += 1 }
+        for _ in 0..<8 { snap("flight"); step(1) }
+    case "head":
+        // the cursor circles the fly; the head should follow it
+        for k in 0..<8 {
+            let a = CGFloat(k) / 8 * 2 * .pi
+            for _ in 0..<40 {
+                fly.state = .idle
+                fly.update(dt: dt, bounds: bounds, mouse: CGPoint(x: cos(a) * 160, y: sin(a) * 160), signals: nil)
+                fly.pos = .zero; fly.heading = .pi / 2; fly.state = .idle
+            }
+            frames.append((fly.node.clone(), "head"))
+        }
+    default:
+        for _ in 0..<8 { step(14, force: .walking); snap("walk") }
+    }
+    for (i, f) in frames.enumerated() {
+        f.0.position = SCNVector3(-196 + CGFloat(i) * 56, 0, f.0.position.z)
+        f.0.eulerAngles = SCNVector3(f.0.eulerAngles.x, f.0.eulerAngles.y, 0)   // all facing up
+        scene.rootNode.addChildNode(f.0)
+    }
+    FlyShadows().update(flies: [], scene: scene)
+    guard let cam = scene.rootNode.childNode(withName: "camera", recursively: false) else { return }
+    cam.camera?.orthographicScale = 40
+    offscreenRender(scene, camNode: cam, size: CGSize(width: 1800, height: 320), path: path)
+}

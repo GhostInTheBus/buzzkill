@@ -1222,6 +1222,7 @@ if args.contains("--attracttest") { runAttractTest(); exit(0) }
 if args.contains("--populationtest") { runPopulationTest() }
 if args.contains("--gfstat") { runGFStat(); exit(0) }
 if args.contains("--motionprofile") { runMotionProfile(); exit(0) }
+if let i = args.firstIndex(of: "--posetest") { runPoseTest(path: args.count > i + 1 ? args[i + 1] : "pose.png", what: args.count > i + 2 ? args[i + 2] : "groom"); exit(0) }
 if let i = args.firstIndex(of: "--splattest") { runSplatTest(path: args.count > i + 1 ? args[i + 1] : "splats.png"); exit(0) }
 if let i = args.firstIndex(of: "--looktest") {
     if args.contains("--beetle") { BODY_FORM = .beetle }

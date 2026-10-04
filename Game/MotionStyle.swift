@@ -15,7 +15,12 @@
 //   * flightArc: flights bow to one side instead of following a ruled line,
 //     and the body faces along the curve.
 //
-// The engine defaults (nil, 1, 0) are upstream's behavior, and are what the
+//   * richGrooming: foreleg rubbing, head wiping, hind-leg rubbing, in turn.
+//   * headTracking: the head turns toward a nearby cursor before the fly bolts.
+//   * runPause: a walk is a string of dashes and abrupt stops, as real flies walk.
+//   * takeoffCrouch / landingReach: a duck before the jump; legs out at touchdown.
+//
+// The engine defaults (nil, 1, 0, off) are upstream's behavior, and are what the
 // headless suites run against.
 
 import Foundation
@@ -25,5 +30,10 @@ enum MotionStyle {
         Fly.boutHold = (walk: 1.2...3.5, groom: 1.8...4.5)
         Fly.strideGain = 6
         Fly.flightArc = 0.22
+        Fly.richGrooming = true
+        Fly.headTracking = true
+        Fly.runPause = (run: 0.35...1.1, pause: 0.10...0.40)
+        Fly.takeoffCrouch = 0.11
+        Fly.landingReach = true
     }
 }

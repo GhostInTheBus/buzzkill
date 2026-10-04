@@ -177,6 +177,10 @@ struct FlyModel {
     var elytraR: SCNNode? = nil
     /// Body-specific wing clearance; the beetle retains its existing stroke.
     var wingFlightSpread: CGFloat = 0.625
+    /// Optional neck joint: display-only, turned toward a nearby cursor.
+    var head: SCNNode? = nil
+    /// Species size relative to the fruit fly (display and hit testing only).
+    var sizeScale: CGFloat = 1
 }
 
 func buildLeg(attach: SCNVector3, baseYaw: CGFloat, swingSign: CGFloat, phase: CGFloat,
@@ -427,6 +431,47 @@ final class Fly {
     static var flightArc: CGFloat = 0
     private var hold: CGFloat = 0          // this bout's minimum duration
     private var arc: CGFloat = 0           // this flight's bow, scene px
+    /// Grooming as three recognizable gestures instead of one leg wiggle.
+    static var richGrooming = false
+    /// The head (if the body has a neck joint) turns toward a nearby cursor.
+    static var headTracking = false
+    /// Walking as dashes and stops: durations of each, or nil for a steady walk.
+    static var runPause: (run: ClosedRange<CGFloat>, pause: ClosedRange<CGFloat>)? = nil
+    /// Seconds of ducking before a takeoff (escapes use under half).
+    static var takeoffCrouch: CGFloat = 0
+    /// Legs reach for the ground through the touchdown flare.
+    static var landingReach = false
+    private var pausing = false, dashTimer: CGFloat = 0
+    private var crouchT: CGFloat = 0, crouchTotal: CGFloat = 0
+    private var headYaw: CGFloat = 0
+    /// a per-fly offset so a crowd doesn't groom in unison (not drawn from the RNG)
+    private lazy var quirk = CGFloat(abs(ObjectIdentifier(self).hashValue % 1000)) / 100
+
+    private func stepRunPause(dt: CGFloat) {
+        guard let rp = Fly.runPause, state == .walking, dartTimer == 0, backwardTimer == 0 else { pausing = false; dashTimer = 0; return }
+        dashTimer -= dt
+        if dashTimer <= 0 { pausing.toggle(); dashTimer = rnd(pausing ? rp.pause : rp.run) }
+    }
+
+    private func updateHead(dt: CGFloat, mouse: CGPoint?) {
+        guard Fly.headTracking, let head = model.head else { return }
+        var target: CGFloat = 0
+        if state == .grooming && Fly.richGrooming && groomMode == 2 {
+            target = sin(time * 9) * 0.22                       // head turns under the wiping forelegs
+        } else if state != .flying && state != .sleeping, let m = mouse {
+            let d = hypot(m.x - pos.x, m.y - pos.y)
+            if d < 420 { target = clampf(angleDiff(heading, atan2(m.y - pos.y, m.x - pos.x)), -0.6, 0.6) * clampf((420 - d) / 160, 0, 1) }
+        }
+        headYaw += (target - headYaw) * lag(9, dt)
+        head.eulerAngles = SCNVector3(0, 0, headYaw)
+    }
+    /// 0,1: forelegs rub together; 2: forelegs wipe the head; 3: hind legs rub.
+    private var groomMode: Int { Fly.debugGroomMode ?? Int((time + quirk) / 1.7) % 4 }
+    static var debugGroomMode: Int? = nil      // --posetest only
+    /// Grooming gesture poses (hip angle, elevation, knee), tuned by eye on --posetest.
+    static var groomPose = (rubAngle: CGFloat(0.98), rubLift: CGFloat(0.45), rubKnee: CGFloat(0.95),
+                            wipeAngle: CGFloat(0.78), wipeLift: CGFloat(0.85), wipeKnee: CGFloat(1.45),
+                            hindAngle: CGFloat(-0.88), hindLift: CGFloat(0.35), hindKnee: CGFloat(0.55))
     var terrain: [Ledge] = []      // walkable window edges, set by the coordinator
     var ledge: Ledge?              // currently attached window edge
 
@@ -537,6 +582,7 @@ final class Fly {
         }
         flightTo = target
         let dist = hypot(target.x - pos.x, target.y - pos.y)
+        crouchTotal = Fly.takeoffCrouch * (escape ? 0.45 : 1); crouchT = crouchTotal
         arc = Fly.flightArc == 0 || leaving ? 0 : rnd(-1...1) * Fly.flightArc * dist
         if arc != 0 {
             // keep the bow on screen: bend the other way near an edge, or not at all
@@ -562,7 +608,7 @@ final class Fly {
         speed = 0
         alt = 0
         pitch = 0
-        node.scale = SCNVector3(FLY_SCALE, FLY_SCALE, FLY_SCALE)
+        node.scale = SCNVector3(FLY_SCALE * model.sizeScale, FLY_SCALE * model.sizeScale, FLY_SCALE * model.sizeScale)
         var p = node.position; p.z = 0; node.position = p
         // Wing closure and leg settling continue from their airborne poses.
     }
@@ -626,6 +672,8 @@ final class Fly {
 
     func update(dt: CGFloat, bounds: CGSize, mouse: CGPoint?, signals: BrainSignals?) {
         time += dt
+        stepRunPause(dt: dt)
+        updateHead(dt: dt, mouse: mouse)
         scareCooldown = max(0, scareCooldown - dt)
         dartCooldown = max(0, dartCooldown - dt)
         backwardTimer = max(0, backwardTimer - dt)
@@ -655,7 +703,8 @@ final class Fly {
                 if let commands = s.legCommands, commands.count == model.legs.count {
                     prepareMotorControl(tempo: motorTempo)
                     saccade = 0
-                    var motion = legDynamics.advance(commands: commands, dt: motorDT)
+                    var motion = legDynamics.advance(
+                        commands: pausing ? Array(repeating: LegMotorCommand(), count: model.legs.count) : commands, dt: motorDT)
                     motion.forward *= Fly.strideGain; motion.lateral *= Fly.strideGain
                     speed = abs(motion.forward) / max(0.001, dt)
                     updateWalk(dt: dt, bounds: bounds, motorMotion: motion)
@@ -790,7 +839,7 @@ final class Fly {
         }
     }
 
-    private var effectiveSpeed: CGFloat { backwardTimer > 0 ? -22 : speed }
+    private var effectiveSpeed: CGFloat { pausing ? 0 : (backwardTimer > 0 ? -22 : speed) }
 
     private func updateWalk(dt: CGFloat, bounds: CGSize, motorMotion: LegBodyMotion? = nil) {
         // refresh the attached ledge from current terrain (windows move/close)
@@ -859,7 +908,7 @@ final class Fly {
     }
 
     private func applyAltitude() {
-        let s = FLY_SCALE * (1 + 0.8 * alt)
+        let s = FLY_SCALE * model.sizeScale * (1 + 0.8 * alt)
         node.scale = SCNVector3(s, s, s)
         var p = node.position
         p.z = 90 * alt
@@ -867,6 +916,14 @@ final class Fly {
     }
 
     private func updateFlight(dt: CGFloat) {
+        if crouchT > 0 {
+            // duck, then go: the body dips (smaller = lower, seen from above) before the jump
+            crouchT -= dt
+            let k = sin(clampf(1 - crouchT / max(0.001, crouchTotal), 0, 1) * .pi)
+            let s = FLY_SCALE * model.sizeScale * (1 - 0.11 * k)
+            node.scale = SCNVector3(s, s, s)
+            return
+        }
         flightT = min(1, flightT + dt / flightDur)
         if flightT >= 1 {
             // touchdown flare: the timer ended, but the fly lands only when it
@@ -935,6 +992,7 @@ final class Fly {
         let stanceFrac = clampf(1 - SWING_DUR * freq, 0.35, 0.9)
         for (i, leg) in model.legs.enumerated() {
             var angle: CGFloat = 0, lift: CGFloat = 0, knee: CGFloat = 0.95
+            var gesture: CGFloat? = nil     // display-only hip angle that may pass the walking joint limit
             if walking {
                 knee = 0.75
                 let p = (gaitPhase + leg.phase).truncatingRemainder(dividingBy: 1)
@@ -947,14 +1005,33 @@ final class Fly {
                 if backwardTimer > 0 { angle = -angle }
             } else if state == .grooming {
                 knee = 0.75
-                if leg.isFront {
+                if Fly.richGrooming {
+                    let anti: CGFloat = leg.swingSign > 0 ? 0 : .pi     // the pair moves against each other
+                    switch groomMode {
+                    case 2 where leg.isFront:       // head wipe: forelegs fold back and sweep across the eyes
+                        gesture = Fly.groomPose.wipeAngle + 0.20 * sin(time * 9)
+                        lift = Fly.groomPose.wipeLift + 0.08 * sin(time * 9 + 1)
+                        knee = Fly.groomPose.wipeKnee
+                    case 3 where i >= 4:            // hind legs reach back past the abdomen and scissor
+                        gesture = Fly.groomPose.hindAngle + 0.10 * sin(time * 16 + anti)
+                        lift = Fly.groomPose.hindLift + 0.10 * sin(time * 16 + anti)
+                        knee = Fly.groomPose.hindKnee + 0.18 * sin(time * 16 + anti)
+                    case 0 where leg.isFront, 1 where leg.isFront:    // the classic: forelegs meet in front of the face and rub
+                        gesture = Fly.groomPose.rubAngle + 0.05 * sin(time * 24 + anti)
+                        lift = Fly.groomPose.rubLift + 0.10 * sin(time * 24 + anti)
+                        knee = Fly.groomPose.rubKnee + 0.20 * sin(time * 24 + anti)
+                    default: break
+                    }
+                } else if leg.isFront {
                     angle = 0.45 + 0.25 * sin(time * 20 + leg.swingSign * 1.3)
                     lift = 0.55 + 0.15 * sin(time * 22)
                 }
             } else if state == .flying {
                 angle = -0.35; lift = 0.5; knee = 0.75
+                if crouchT > 0 { angle = 0; lift = 0.02; knee = 1.35 }                       // ducked, legs loaded
+                else if Fly.landingReach && flightT > 0.86 { angle = 0.12; lift = 0.10; knee = 0.42 }  // reaching for the ground
             }
-            angle = clampf(angle, -LegDynamics.hipLimit, LegDynamics.hipLimit)
+            angle = gesture ?? clampf(angle, -LegDynamics.hipLimit, LegDynamics.hipLimit)
             lift = clampf(lift, LegDynamics.elevationRange.lowerBound, LegDynamics.elevationRange.upperBound)
             if state != .flying { lift = max(lift, LegDynamics.groundElevation(leg.geometry, knee: knee)) }
             let from = legBlendFrom[i]
