@@ -773,6 +773,7 @@ final class Coordinator: NSObject, SCNSceneRendererDelegate {
     func placeHeldCrumb(at p: CGPoint) { enqueue { c in c.game.crumbs.place(world: c, at: p) } }
     func catchUpArrivals() { enqueue { c in c.game.population.catchUp(world: c) } }
     func inviteFlies(_ n: Int) { enqueue { c in c.game.population.invite(n, world: c) } }
+    func setOtherPests(_ on: Bool) { enqueue { $0.game.population.speciesMix = on } }
     func setHand(_ p: CGPoint?, extent: CGFloat) {
         lock.lock(); handScene = p; handExtent = extent; lock.unlock()
     }
@@ -1198,6 +1199,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case .flyDetailed: bodyItem?.title = "Body: Fruit Fly (detailed) — switch to classic"
         case .fly: bodyItem?.title = "Body: Fruit Fly (classic) — switch to Stag Beetle"
         case .beetle: bodyItem?.title = "Body: Stag Beetle — switch to Fruit Fly (detailed)"
+        default: break      // housefly and mosquito arrive on their own; they aren't a body choice
         }
     }
 }
@@ -1222,6 +1224,7 @@ if args.contains("--attracttest") { runAttractTest(); exit(0) }
 if args.contains("--populationtest") { runPopulationTest() }
 if args.contains("--gfstat") { runGFStat(); exit(0) }
 if args.contains("--motionprofile") { runMotionProfile(); exit(0) }
+if let i = args.firstIndex(of: "--speciestest") { runSpeciesTest(path: args.count > i + 1 ? args[i + 1] : "species.png"); exit(0) }
 if let i = args.firstIndex(of: "--posetest") { runPoseTest(path: args.count > i + 1 ? args[i + 1] : "pose.png", what: args.count > i + 2 ? args[i + 2] : "groom"); exit(0) }
 if let i = args.firstIndex(of: "--splattest") { runSplatTest(path: args.count > i + 1 ? args[i + 1] : "splats.png"); exit(0) }
 if let i = args.firstIndex(of: "--looktest") {

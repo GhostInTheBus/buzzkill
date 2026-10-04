@@ -16,6 +16,14 @@ final class Population {
     private var scheduledAway = false   // which regime the pending wait was drawn from
     private var shake: CGFloat = 0
     private(set) var spooked = false
+    /// Not every arrival is a fruit fly: some are houseflies, a few are mosquitoes.
+    /// (They all run on the same fly brain, if they end up carrying it.)
+    var speciesMix = false
+    private func arrivalForm() -> BodyForm? {
+        guard speciesMix else { return nil }
+        let r = rnd(0...1)
+        return r < 0.13 ? .mosquito : (r < 0.31 ? .housefly : nil)
+    }
     /// Crumbs draw a crowd: each crumb dropped adds room for three more flies
     /// (up to +12), who arrive within seconds and stay. Fades by one every 5 min.
     private(set) var crumbDraw: CGFloat = 0
@@ -123,7 +131,8 @@ final class Population {
         case 2: p = CGPoint(x: rnd(-hw...hw), y: -hh)
         default: p = CGPoint(x: rnd(-hw...hw), y: hh)
         }
-        let fly = Fly(at: p)
+        // the first fly on screen carries the brain; keep that one a fruit fly
+        let fly = Fly(at: p, form: world.flies.isEmpty ? nil : arrivalForm())
         world.scene.rootNode.addChildNode(fly.node)
         world.flies.append(fly)
         fly.startFlight(bounds: world.bounds)   // arrives on the wing

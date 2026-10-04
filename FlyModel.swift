@@ -51,13 +51,17 @@ enum BodyForm: String {
     case fly = "fruit fly"
     case flyDetailed = "fruit fly (detailed)"
     case beetle = "stag beetle"
+    case housefly = "housefly"
+    case mosquito = "mosquito"
 }
 var BODY_FORM: BodyForm = .fly
 
-func buildBody() -> FlyModel {
-    switch BODY_FORM {
+func buildBody(_ form: BodyForm = BODY_FORM) -> FlyModel {
+    switch form {
     case .fly:    return buildFlyModel()
     case .flyDetailed: return buildDetailedFlyModel()
+    case .housefly: return buildHouseflyModel()
+    case .mosquito: return buildMosquitoModel()
     case .beetle: return buildBeetleModel()
     }
 }
@@ -181,6 +185,10 @@ struct FlyModel {
     var head: SCNNode? = nil
     /// Species size relative to the fruit fly (display and hit testing only).
     var sizeScale: CGFloat = 1
+    /// Wingbeat pitch relative to the fruit fly (sound only).
+    var voice: CGFloat = 1
+    /// Fold angle of the wings at rest.
+    var wingRest: CGFloat = 0.13
 }
 
 func buildLeg(attach: SCNVector3, baseYaw: CGFloat, swingSign: CGFloat, phase: CGFloat,
@@ -495,8 +503,12 @@ final class Fly {
     private var liveArousal: CGFloat = 0
     private var liveWing: CGFloat = 0
 
-    init(at p: CGPoint) {
-        model = buildBody()
+    /// A fly of a fixed species keeps its own body whatever the global BODY_FORM is.
+    let ownForm: BodyForm?
+
+    init(at p: CGPoint, form: BodyForm? = nil) {
+        ownForm = form
+        model = buildBody(form ?? BODY_FORM)
         legDynamics = SixLegDynamics(geometries: model.legs.map(\.geometry))
         for (leg, pose) in zip(model.legs, legDynamics.feedback) { leg.apply(pose) }
         sensedLegFeedback = []
@@ -507,6 +519,7 @@ final class Fly {
     /// Rebuild the body in the current `BODY_FORM`, in place. Behavior state
     /// (position, gait phase, flight, ledge) is untouched — only geometry swaps.
     func swapBody() {
+        guard ownForm == nil else { return }   // a mosquito stays a mosquito
         let old = model.root
         let parent = old.parent
         old.removeFromParentNode()
@@ -1087,7 +1100,7 @@ final class Fly {
         let beat = smoothstep((wingFlightAmount - 0.8) / 0.2)
         for (i, wing) in model.foldedWings.childNodes.enumerated() {
             let side: CGFloat = i == 0 ? -1 : 1
-            let groundedSpread = 0.13 + 0.3 * wingRaise
+            let groundedSpread = model.wingRest + 0.3 * wingRaise
             let spread = groundedSpread + (model.wingFlightSpread - groundedSpread) * wingFlightAmount
             wing.eulerAngles = SCNVector3(-0.5 * wingRaise * (1 - wingFlightAmount) + stroke * 0.35 * beat,
                 0, side * (spread + 0.175 * stroke * beat))

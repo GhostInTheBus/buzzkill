@@ -96,8 +96,9 @@ final class Game {
     private func buzz(world: GameWorld) {
         guard let snd = sound else { return }
         if let f = world.flies.filter({ $0.state == .flying }).max(by: { $0.effortCurrent < $1.effortCurrent }) {
-            snd.setBuzz(level: Float(0.45 + 0.55 * f.effortCurrent) * Float(0.6 + 0.4 * f.alt),
-                        pitch: Float(0.9 + 0.6 * f.effortCurrent),
+            // a housefly drones lower, a mosquito whines
+            snd.setBuzz(level: Float(0.45 + 0.55 * f.effortCurrent) * Float(0.6 + 0.4 * f.alt) * (f.model.voice > 2 ? 0.55 : 1),
+                        pitch: Float((0.9 + 0.6 * f.effortCurrent) * f.model.voice),
                         pan: Float(clampf(f.pos.x / (world.bounds.width / 2), -1, 1)))
         } else {
             snd.setBuzz(level: 0, pitch: 1, pan: 0)

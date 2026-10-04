@@ -27,6 +27,8 @@ Keep this list short and current; it is what makes `tools/merge-upstream.sh` pai
 - `attractTarget` + a body-level heading bias toward it while walking (after upstream's `if let motion … else { wander }` pair — do not split that pair).
 - `attractHop(toward:bounds:dt:)` and `startFlight(… toward:)`: flight to an attractant, landing just short.
 - Motion style statics `Fly.boutHold`, `Fly.strideGain`, `Fly.flightArc` (defaults nil / 1 / 0 = upstream's motion, which is what the suites run) and their use in `brainBehavior`, the motor-mode walk, `startFlight` and `updateFlight`. Set by `Game/MotionStyle.swift` at app launch.
+- More style statics, all default-off: `richGrooming` (+ `groomPose`, display-only hip angles past the walking limit), `headTracking`, `runPause`, `takeoffCrouch`, `landingReach`.
+- `FlyModel` gains optional `head` (neck joint), `sizeScale`, `voice`, `wingRest`; `Fly.init(at:form:)` and `ownForm` let one fly keep its own species; `buildBody(_:)` takes a form; `BodyForm` gains `.housefly`, `.mosquito` (built in `Game/DetailedFly.swift`).
 - `leaveChance` / `forceLeave` / `leaving` / `gone`: an escape from a threat may continue off screen; `land()` marks the fly gone.
 - abdomen pivot moved to the waist (position compensated) + `abdWag` during grooming.
 

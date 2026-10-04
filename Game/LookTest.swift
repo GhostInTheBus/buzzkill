@@ -6,6 +6,37 @@
 
 import SceneKit
 
+/// The three species side by side, standing and in flight.  ./Buzzkill --speciestest out.png
+func runSpeciesTest(path: String) {
+    MotionStyle.apply()
+    let bounds = CGSize(width: 1400, height: 1000)
+    let scene = buildScene(bounds: bounds)
+    let bg = NSImage(size: NSSize(width: 64, height: 64))
+    bg.lockFocus()
+    NSGradient(colors: [NSColor(calibratedRed: 0.36, green: 0.47, blue: 0.62, alpha: 1), NSColor(calibratedRed: 0.78, green: 0.80, blue: 0.84, alpha: 1)])!
+        .draw(in: NSRect(x: 0, y: 0, width: 64, height: 64), angle: 20)
+    bg.unlockFocus()
+    scene.background.contents = bg
+    TestRandom.reset("speciestest")
+    var flies: [Fly] = []
+    for (i, form) in [BodyForm.flyDetailed, .housefly, .mosquito].enumerated() {
+        let x = -70 + CGFloat(i) * 70
+        let a = Fly(at: CGPoint(x: x, y: 28), form: form); a.heading = 1.75
+        a.state = .idle
+        for _ in 0..<30 { a.update(dt: 1 / 60, bounds: bounds, mouse: nil, signals: nil); a.pos = CGPoint(x: x, y: 28); a.heading = 1.75; a.state = .idle }
+        a.update(dt: 0.0001, bounds: bounds, mouse: nil, signals: nil)
+        let b = Fly(at: CGPoint(x: x, y: -32), form: form)
+        b.startFlight(bounds: bounds, effort: 0.6)
+        for _ in 0..<34 { b.update(dt: 1 / 60, bounds: bounds, mouse: nil, signals: nil) }
+        b.pos = CGPoint(x: x, y: -32); b.node.position = SCNVector3(x, -32, b.node.position.z)
+        for f in [a, b] { scene.rootNode.addChildNode(f.node); flies.append(f) }
+    }
+    FlyShadows().update(flies: flies, scene: scene)
+    guard let cam = scene.rootNode.childNode(withName: "camera", recursively: false) else { return }
+    cam.camera?.orthographicScale = 66
+    offscreenRender(scene, camNode: cam, size: CGSize(width: 1300, height: 800), path: path)
+}
+
 func runLookTest(path: String) {
     let bounds = CGSize(width: 1400, height: 1000)
     let scene = buildScene(bounds: bounds)

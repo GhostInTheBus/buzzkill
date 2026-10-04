@@ -36,13 +36,13 @@ final class Splats {
     /// Removes and splats the first grounded fly within reach. Returns it, or nil.
     func squish(at p: CGPoint, world: GameWorld) -> Fly? {
         guard enabled else { return nil }
-        guard let i = world.flies.firstIndex(where: { $0.state != .flying && hypot(p.x - $0.pos.x, p.y - $0.pos.y) < hitRadius })
+        guard let i = world.flies.firstIndex(where: { $0.state != .flying && hypot(p.x - $0.pos.x, p.y - $0.pos.y) < hitRadius * $0.model.sizeScale })
         else { return nil }
         let fly = world.flies.remove(at: i)
         // what kind of mark depends on how you hit it: a moving cursor smears along its
         // path, a dead-center click bursts, a hit near the edge of the hitbox only glances
         let v = world.cursorVelocity, speed = hypot(v.x, v.y)
-        let off = hypot(p.x - fly.pos.x, p.y - fly.pos.y) / hitRadius
+        let off = hypot(p.x - fly.pos.x, p.y - fly.pos.y) / (hitRadius * fly.model.sizeScale)
         let style: Style, angle: CGFloat
         if speed > 260 { style = .smear; angle = atan2(v.y, v.x) }
         else {
@@ -93,7 +93,8 @@ final class Splats {
                                   NSColor(calibratedRed: 0.42, green: 0.30, blue: 0.10, alpha: 0.85),
                                   NSColor(calibratedRed: 0.34, green: 0.09, blue: 0.07, alpha: 0.9),
                                   NSColor(calibratedRed: 0.18, green: 0.13, blue: 0.10, alpha: 0.92)]
-        let goo = palette[Int(r(0, 3.999))]
+        // a mosquito is full of someone's blood
+        let goo = fly?.ownForm == .mosquito ? NSColor(calibratedRed: 0.55, green: 0.04, blue: 0.05, alpha: 0.92) : palette[Int(r(0, 3.999))]
         let pale = NSColor(calibratedRed: 0.78, green: 0.66, blue: 0.30, alpha: 0.55)
         func blob(_ rad: CGFloat, at o: CGPoint, sx: CGFloat = 1, sy: CGFloat = 1, rot: CGFloat = 0, color: NSColor? = nil) {
             let cyl = SCNCylinder(radius: rad, height: 0.4)
@@ -156,7 +157,8 @@ final class Splats {
             body.position = SCNVector3(bodyOffset.x, bodyOffset.y, 0.25)
             // seen from straight above, "flat" has to be drawn as "spread": wider than
             // long, wings knocked outward, legs bent the wrong way
-            body.scale = SCNVector3(FLY_SCALE * bodyScale * 1.22, FLY_SCALE * bodyScale * 0.94, 0.08)
+            let sz = FLY_SCALE * fly.model.sizeScale * bodyScale
+            body.scale = SCNVector3(sz * 1.22, sz * 0.94, 0.08)
             body.eulerAngles = SCNVector3(0, 0, r(0, 2 * .pi))
             for (i, wing) in fly.model.foldedWings.childNodes.enumerated() {
                 wing.eulerAngles = SCNVector3(0, 0, (i == 0 ? -1 : 1) * r(0.55, 1.5))

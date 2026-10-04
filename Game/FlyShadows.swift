@@ -66,7 +66,8 @@ final class FlyShadows {
             node.position = SCNVector3(fly.pos.x + back.x + 3.0 + alt * 40, fly.pos.y + back.y - 4.2 - alt * 52, 0.05)
             node.eulerAngles = SCNVector3(0, 0, fly.heading - .pi / 2)
             let grow = 1 + alt * 0.7
-            node.scale = SCNVector3(21 * FLY_SCALE * grow, 34 * FLY_SCALE * grow, 1)
+            let sz = FLY_SCALE * fly.model.sizeScale
+            node.scale = SCNVector3(21 * sz * grow, 34 * sz * grow, 1)
             node.opacity = fly.node.isHidden ? 0 : (1 - 0.6 * alt)
         }
         for (id, n) in nodes where !live.contains(id) { n.removeFromParentNode(); nodes[id] = nil }

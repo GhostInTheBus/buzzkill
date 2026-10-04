@@ -118,11 +118,34 @@ brain decisions, the app now applies a motion style:
 | walking speed | 11 px/s (0.4 body lengths) | 72 px/s (2.8 body lengths) |
 | distance per walk | 6 px | 161 px |
 
+| walking speed, with dashes and stops | — | 52 px/s average, dashes to ~130 |
+
 It commits to a walk or a groom for a randomized bout (escape, darting, sleep
 and backing up still interrupt at once); a stride gain lets the leg circuit's
 stepping carry the body further — the gait is the circuit's, the distance per
 step is a choice; and flights bow to one side with the body facing along the
-curve instead of following a ruled line.
+curve instead of following a ruled line. A walk is a string of dashes and
+abrupt stops, the way real flies walk. Grooming cycles three gestures — the
+forelegs meet in front of the face and rub, the forelegs wipe the head, the
+hind legs reach back and scissor:
+
+![grooming](assets/grooming.png)
+
+The head turns to follow your cursor when it's close. Takeoff starts with a
+duck; landing ends with the legs out. `./Buzzkill --posetest out.png
+groom|takeoff|landing|flight|head` renders any of these as a contact sheet.
+
+## Other pests
+
+![fruit fly, housefly, mosquito](assets/species.png)
+
+Not every arrival is a fruit fly (`o` toggles this): about one in six is a
+**housefly** — half again as big, grey with four black stripes, a lower drone —
+and one in eight is a **mosquito**: stilt legs, a needle, feathery antennae, a
+whine, and a red splat. Same skeleton, same behavior, different suit; if one of
+them ends up carrying the brain, it is a fruit-fly brain in that suit. The first
+fly on screen is always a fruit fly. Bigger pests are easier to hit. 160 mixed
+insects hold 92 fps here.
 
 ## Two looks
 

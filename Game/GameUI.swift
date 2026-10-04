@@ -12,6 +12,9 @@ final class GameUI: NSObject {
     private var coordinator: Coordinator { app.coordinator }
 
     // persisted toggles
+    static let pestsKey = "otherPests"
+    private var pestsItem: NSMenuItem?
+    private var pestsOn = true
     static let attractKey = "attractCursor", squishKey = "squishClick", soundKey = "flySound", cameraKey = "cameraSwat", hearingKey = "hearingMic"
     private(set) var attractOn = false, squishOn = true, soundOn = true, cameraOn = false, hearingOn = false
     private var attractItem, squishItem, soundItem, cameraItem, loginItem, statsItem, hitboxItem, hearingItem: NSMenuItem?
@@ -55,6 +58,8 @@ final class GameUI: NSObject {
         menu.addItem(attractItem!)
         menu.addItem(item("Pick Up a Crumb (click to drop)", #selector(pickUpCrumb), "m"))
         menu.addItem(item("Add 5 Flies", #selector(addFive), "5"))
+        pestsItem = item("Other Pests: On", #selector(togglePests), "o")
+        menu.addItem(pestsItem!)
         loginItem = item("Launch at Login", #selector(toggleLogin), "l")
         menu.addItem(loginItem!)
         refreshLoginItem()
@@ -94,6 +99,7 @@ final class GameUI: NSObject {
         if d.bool(forKey: GameUI.cameraKey), CameraSense.authorization == .authorized { startCamera() }
         if d.bool(forKey: GameUI.hearingKey), Hearing.authorization == .authorized { startHearing() }
         setDifficulty(d.integer(forKey: GameUI.difficultyKey))
+        setPests(d.object(forKey: GameUI.pestsKey) as? Bool ?? true)
         coordinator.enqueue { [weak self] c in
             c.game.onMiss = { lead in DispatchQueue.main.async { self?.showMiss(lead: lead) } }
         }
@@ -184,6 +190,13 @@ final class GameUI: NSObject {
     @objc func toggleSquish() { setSquish(!squishOn) }
     @objc func toggleSound() { setSound(!soundOn) }
     @objc func addFive() { coordinator.inviteFlies(5) }
+    @objc func togglePests() { setPests(!pestsOn) }
+    private func setPests(_ on: Bool) {
+        pestsOn = on
+        coordinator.setOtherPests(on)
+        UserDefaults.standard.set(on, forKey: GameUI.pestsKey)
+        pestsItem?.title = on ? "Other Pests: On (houseflies, mosquitoes)" : "Other Pests: Off"
+    }
     @objc func pickUpCrumb() {
         holdingCrumb = true
         coordinator.pickUpCrumb()
