@@ -103,6 +103,27 @@ whole game layer: crumbs, squishing, arrivals, scattering, stats. There is no
 feeding or olfactory circuit in the data; the attractant is a synthetic input
 in the same spirit as the author's loom.
 
+## How it moves
+
+Measured with `./Buzzkill --motionprofile` (add `--engine` for upstream's raw
+motion). The engine's fly changed its mind about 1.5 times a second and
+"walked" at 11 px/s — under half a body length a second, 6 px per bout — so it
+twitched in place and only really travelled by flying. On top of the same
+brain decisions, the app now applies a motion style:
+
+| | engine | Buzzkill |
+|---|---|---|
+| walking bout / grooming bout | 0.5 s / 0.6 s | 2.2 s / 2.9 s |
+| state changes per second | 1.5 | 0.65 |
+| walking speed | 11 px/s (0.4 body lengths) | 72 px/s (2.8 body lengths) |
+| distance per walk | 6 px | 161 px |
+
+It commits to a walk or a groom for a randomized bout (escape, darting, sleep
+and backing up still interrupt at once); a stride gain lets the leg circuit's
+stepping carry the body further — the gait is the circuit's, the distance per
+step is a choice; and flights bow to one side with the body facing along the
+curve instead of following a ruled line.
+
 ## Two looks
 
 | classic (upstream) | detailed (this project, default) |

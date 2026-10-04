@@ -63,6 +63,7 @@ func runLookTest(path: String) {
 ///   ./Buzzkill --motionprofile
 func runMotionProfile() {
     guard let data = loadBrainData() else { fputs("no data\n", stderr); exit(1) }
+    if !CommandLine.arguments.contains("--engine") { MotionStyle.apply() }   // --engine: upstream's raw motion
     let bounds = CGSize(width: 1728, height: 1080)
     let dt: CGFloat = 1.0 / 120.0
     var agg: [String: (time: CGFloat, dist: CGFloat, turn: CGFloat, bouts: Int)] = [:]

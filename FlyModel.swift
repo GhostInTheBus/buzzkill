@@ -417,6 +417,16 @@ final class Fly {
     private var saccadeRate: CGFloat = 0
     var dartTimer: CGFloat = 0
     var stateAge: CGFloat = 0
+    // Motion style (app-level; the defaults are upstream's behavior, which is what
+    // the test suites exercise). See Game/MotionStyle.swift.
+    /// Minimum time a walking / grooming bout is held once begun, or nil.
+    static var boutHold: (walk: ClosedRange<CGFloat>, groom: ClosedRange<CGFloat>)? = nil
+    /// Body travel per unit of leg-circuit stride, motor mode only.
+    static var strideGain: CGFloat = 1
+    /// Sideways bow of a flight path as a fraction of its length (0 = straight).
+    static var flightArc: CGFloat = 0
+    private var hold: CGFloat = 0          // this bout's minimum duration
+    private var arc: CGFloat = 0           // this flight's bow, scene px
     var terrain: [Ledge] = []      // walkable window edges, set by the coordinator
     var ledge: Ledge?              // currently attached window edge
 
@@ -527,6 +537,16 @@ final class Fly {
         }
         flightTo = target
         let dist = hypot(target.x - pos.x, target.y - pos.y)
+        arc = Fly.flightArc == 0 || leaving ? 0 : rnd(-1...1) * Fly.flightArc * dist
+        if arc != 0 {
+            // keep the bow on screen: bend the other way near an edge, or not at all
+            let px = -(target.y - pos.y) / max(1, dist), py = (target.x - pos.x) / max(1, dist)
+            func inside(_ a: CGFloat) -> Bool {
+                let mx = (pos.x + target.x) / 2 + px * a, my = (pos.y + target.y) / 2 + py * a
+                return abs(mx) < bounds.width / 2 - 30 && abs(my) < bounds.height / 2 - 30
+            }
+            if !inside(arc) { arc = inside(-arc) ? -arc : 0 }
+        }
         flightDur = escape ? clampf(dist / 650, 0.45, 1.2) : clampf(dist / 420, 0.7, 2.0)
         flightT = 0
         scareCooldown = escape ? 2.0 : 2.5
@@ -635,7 +655,8 @@ final class Fly {
                 if let commands = s.legCommands, commands.count == model.legs.count {
                     prepareMotorControl(tempo: motorTempo)
                     saccade = 0
-                    let motion = legDynamics.advance(commands: commands, dt: motorDT)
+                    var motion = legDynamics.advance(commands: commands, dt: motorDT)
+                    motion.forward *= Fly.strideGain; motion.lateral *= Fly.strideGain
                     speed = abs(motion.forward) / max(0.001, dt)
                     updateWalk(dt: dt, bounds: bounds, motorMotion: motion)
                 } else {
@@ -730,17 +751,21 @@ final class Fly {
         }
         // DNg11 (grooming command) hysteresis
         if state != .walking || dartTimer == 0 {
-            if state != .grooming, s.groomDrive > 0.5, s.nervous < 0.3, stateAge > 0.4 {
+            // a walking bout in progress is not cut short to groom
+            if state != .grooming, s.groomDrive > 0.5, s.nervous < 0.3,
+               stateAge > (state == .walking ? max(0.4, hold) : 0.4) {
                 setState(.grooming)
-            } else if state == .grooming, s.groomDrive < 0.3, stateAge > 0.6 {
+                hold = Fly.boutHold.map { rnd($0.groom) } ?? 0
+            } else if state == .grooming, s.groomDrive < 0.3, stateAge > max(0.6, hold) {
                 setState(.idle)
             }
         }
         // DNp09 (forward-walking command) hysteresis
         if state == .idle, s.walkDrive > 0.22, stateAge > 0.4 {
             setState(.walking)
+            hold = Fly.boutHold.map { rnd($0.walk) } ?? 0
             startSaccade()
-        } else if state == .walking, dartTimer == 0, s.walkDrive < 0.08, stateAge > 0.5 {
+        } else if state == .walking, dartTimer == 0, s.walkDrive < 0.08, stateAge > max(0.5, hold) {
             setState(.idle)
             speed = 0
         }
@@ -860,9 +885,13 @@ final class Fly {
         let len = max(1, hypot(dx, dy))
         let px = -dy / len, py = dx / len
         let wob = sin(time * 32) * 4 * sin(flightT * .pi)
-        pos.x = flightFrom.x + dx * e + px * wob
-        pos.y = flightFrom.y + dy * e + py * wob
-        turnToward(atan2(dy, dx) + sin(time * 18) * 0.12, dt: dt)
+        // a bowed path: out to the side mid-flight, back on line at the target
+        let bow = arc * sin(.pi * e)
+        pos.x = flightFrom.x + dx * e + px * (wob + bow)
+        pos.y = flightFrom.y + dy * e + py * (wob + bow)
+        // face along the curve, not the chord
+        let k = arc * .pi * cos(.pi * e)
+        turnToward(atan2(dy + py * k, dx + px * k) + sin(time * 18) * 0.12, dt: dt)
         // altitude: climb, effort-scaled cruise with buzz-wobble, descend to land.
         // Effort stays live: ongoing escape-DN (DNp02/04/11) and arousal activity
         // pushes the fly to beat harder and fly higher mid-flight.

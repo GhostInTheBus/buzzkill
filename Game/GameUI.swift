@@ -86,6 +86,7 @@ final class GameUI: NSObject {
 
     /// Apply persisted settings at launch.
     func restore() {
+        MotionStyle.apply()
         let d = UserDefaults.standard
         if d.bool(forKey: GameUI.attractKey) { setAttract(true) }
         setSquish(d.object(forKey: GameUI.squishKey) as? Bool ?? true)
