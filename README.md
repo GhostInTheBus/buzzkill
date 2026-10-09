@@ -2,6 +2,10 @@
 
 **The only desktop pest where the kill is fair.**
 
+https://github.com/user-attachments/assets/b979617d-55f9-452f-bcfb-4d8cafdf01d5
+
+[Watch on YouTube](https://youtu.be/hnrluK6MwHA)
+
 A fruit fly lives on your Mac desktop and is run by a real fruit fly brain:
 668 neurons and 18,968 synapses from the FlyWire connectome — the circuit that
 spots danger and triggers escape — simulated live. Rush your cursor at it and
