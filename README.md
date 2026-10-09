@@ -2,7 +2,7 @@
 
 **The only desktop pest where the kill is fair.**
 
-[![Watch the Buzzkill explainer on YouTube](assets/buzzkill-video.jpg)](https://youtu.be/hnrluK6MwHA)
+https://github.com/user-attachments/assets/dbc4b133-4b55-4880-a431-bee7c533ae76
 
 [Watch on YouTube](https://youtu.be/hnrluK6MwHA) (1:25)
 
