@@ -2,9 +2,9 @@
 
 **The only desktop pest where the kill is fair.**
 
-https://github.com/user-attachments/assets/b979617d-55f9-452f-bcfb-4d8cafdf01d5
+[![Watch the Buzzkill explainer on YouTube](assets/buzzkill-video.jpg)](https://youtu.be/hnrluK6MwHA)
 
-[Watch on YouTube](https://youtu.be/hnrluK6MwHA)
+[Watch on YouTube](https://youtu.be/hnrluK6MwHA) (1:25)
 
 A fruit fly lives on your Mac desktop and is run by a real fruit fly brain:
 668 neurons and 18,968 synapses from the FlyWire connectome — the circuit that
